@@ -35,6 +35,8 @@ Demo account for stakeholder walkthroughs: `index.html?demo=1` — loads a pre-p
 | **About Me** | Values, goals, self-knowledge note, data export |
 | **Milestones** | Add and view personal milestones by category |
 | **Journey** | Unified filterable timeline of everything |
+| **Share my week** | User-initiated, mood-only summary — never notes, journal or letters |
+| **Need help now** | Static signposting (Childline, Shout, Samaritans, Papyrus) — no tracking |
 
 Installable as a PWA (manifest + service worker, works offline after first load).
 

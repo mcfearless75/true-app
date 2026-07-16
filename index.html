@@ -335,6 +335,32 @@
 
     .btn-secondary:hover { background: var(--bg2); }
 
+    /* Overlays — share my week, need help now */
+    .overlay {
+      position: fixed; inset: 0; z-index: 1000;
+      background: rgba(20, 30, 28, 0.5);
+      display: none; align-items: center; justify-content: center;
+      padding: 18px;
+    }
+    .overlay.open { display: flex; }
+    .overlay-card {
+      background: var(--bg); border-radius: 20px;
+      padding: 24px 22px; width: 100%; max-width: 420px;
+      max-height: 82vh; overflow-y: auto;
+    }
+    .help-line {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 12px; padding: 13px 0; border-bottom: 1px solid var(--bg3);
+    }
+    .help-line:last-of-type { border-bottom: none; }
+    .help-line a { color: var(--tr); font-weight: 600; text-decoration: none; font-size: 15px; white-space: nowrap; }
+    .link-quiet {
+      background: none; border: none; cursor: pointer;
+      font-size: 13px; color: var(--text3);
+      text-decoration: underline; text-underline-offset: 3px;
+      font-family: inherit; padding: 4px 0;
+    }
+
     .btn-sm {
       padding: 7px 13px;
       font-size: 12px;
@@ -693,6 +719,9 @@
       <div class="pin-key empty"></div><button class="pin-key" onclick="lockTap(0)">0</button><button class="pin-key del" onclick="lockDel()">⌫</button>
     </div>
     <div class="pin-hint" id="lock-hint">Enter your code</div>
+    <div style="margin-top:22px">
+      <button class="link-quiet" onclick="openHelp()">Need to talk to someone right now?</button>
+    </div>
   </div>
 
   <!-- ── Header ───────────────────────────────────────────────── -->
@@ -724,6 +753,9 @@
 
     <div class="section-label">THIS WEEK</div>
     <div class="card-soft mood-bar-chart" id="home-moodbar"></div>
+    <div style="text-align:right;margin-top:4px">
+      <button class="link-quiet" style="color:var(--tr);text-decoration:none" onclick="openShareWeek()">Share my week &rarr;</button>
+    </div>
 
     <div class="section-label">SOMETHING TO THINK ABOUT</div>
     <div class="card-soft" style="cursor:pointer" onclick="showView('journal')">
@@ -733,6 +765,75 @@
 
     <div class="section-label">LAST MILESTONE</div>
     <div id="home-milestone"></div>
+
+    <div style="text-align:center;margin-top:30px;padding-bottom:8px">
+      <button class="link-quiet" onclick="openHelp()">Need to talk to someone right now?</button>
+    </div>
+  </div>
+
+  <!-- SHARE MY WEEK — user-initiated, mood-only. Never notes, journal or letters. -->
+  <div class="overlay" id="share-overlay" onclick="if(event.target===this)closeShare()">
+    <div class="overlay-card">
+      <div class="page-title" style="font-size:20px">Share my week</div>
+      <div style="font-size:14px;color:var(--text2);line-height:1.6;margin:8px 0 14px">
+        This is <strong>everything</strong> that would be shared — just how you felt each day.
+        None of your notes, journal or letters. Ever. And it only goes where you send it.
+      </div>
+      <div class="card-soft" id="share-preview" style="margin-bottom:16px"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-primary" style="flex:1" onclick="shareWeek()">Share</button>
+        <button class="btn-secondary" style="flex:1" onclick="copyWeek()">Copy</button>
+      </div>
+      <div id="share-msg" style="font-size:13px;color:var(--tr);margin-top:10px;display:none">Copied — paste it wherever you like.</div>
+      <div style="text-align:center;margin-top:14px">
+        <button class="link-quiet" onclick="closeShare()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NEED HELP NOW — static signposting. No tracking, nothing leaves the app. -->
+  <div class="overlay" id="help-overlay" onclick="if(event.target===this)closeHelp()">
+    <div class="overlay-card">
+      <div class="page-title" style="font-size:20px">If things feel too big right now</div>
+      <div style="font-size:14px;color:var(--text2);line-height:1.6;margin:8px 0 10px">
+        You don't have to sort it on your own. These are free, confidential, and used to talking with young people.
+        Nothing you say to them touches this app — and nothing in this app is ever shared with them.
+      </div>
+      <div class="help-line">
+        <div>
+          <div style="font-size:15px;color:var(--text);font-weight:600">Childline</div>
+          <div style="font-size:13px;color:var(--text3)">Under 19 · calls are free and don't show on bills</div>
+        </div>
+        <a href="tel:08001111">0800 1111</a>
+      </div>
+      <div class="help-line">
+        <div>
+          <div style="font-size:15px;color:var(--text);font-weight:600">Shout</div>
+          <div style="font-size:13px;color:var(--text3)">24/7 · text SHOUT to start</div>
+        </div>
+        <a href="sms:85258">Text 85258</a>
+      </div>
+      <div class="help-line">
+        <div>
+          <div style="font-size:15px;color:var(--text);font-weight:600">Samaritans</div>
+          <div style="font-size:13px;color:var(--text3)">24/7 · any age, anything</div>
+        </div>
+        <a href="tel:116123">116 123</a>
+      </div>
+      <div class="help-line">
+        <div>
+          <div style="font-size:15px;color:var(--text);font-weight:600">Papyrus HOPELINE247</div>
+          <div style="font-size:13px;color:var(--text3)">Under 35 · thoughts of suicide</div>
+        </div>
+        <a href="tel:08000684141">0800 068 4141</a>
+      </div>
+      <div style="font-size:13px;color:var(--text3);line-height:1.6;margin-top:12px">
+        If you're in immediate danger, call <strong style="color:var(--text)">999</strong>.
+      </div>
+      <div style="text-align:center;margin-top:14px">
+        <button class="link-quiet" onclick="closeHelp()">Close</button>
+      </div>
+    </div>
   </div>
 
   <!-- MOOD -->
@@ -1324,6 +1425,51 @@ function renderHome() {
     `;
   }
 }
+
+// ─── Share my week ────────────────────────────────────────────
+// User-initiated, mood-only. The preview IS the payload — nothing
+// else is ever included. Notes, journal and letters never leave.
+function weekShareLines() {
+  return S.moods.slice(-7).map(m => `${m.d} — ${m.l}`);
+}
+
+function weekShareText() {
+  return 'My week:\n' + weekShareLines().join('\n') +
+         '\n\nShared by me, from my True app. Just how I felt — nothing I wrote.';
+}
+
+function openShareWeek() {
+  const lines = weekShareLines();
+  document.getElementById('share-preview').innerHTML = lines.length
+    ? lines.map(l => `<div style="font-size:14px;color:var(--text);line-height:2">${l}</div>`).join('')
+    : '<div style="font-size:14px;color:var(--text3);line-height:1.6">Nothing to share yet — check in first, then come back.</div>';
+  document.getElementById('share-overlay').classList.add('open');
+}
+
+async function shareWeek() {
+  if (!weekShareLines().length) return;
+  if (navigator.share) {
+    try { await navigator.share({ text: weekShareText() }); } catch (e) { /* user cancelled */ }
+  } else {
+    copyWeek();
+  }
+}
+
+async function copyWeek() {
+  if (!weekShareLines().length) return;
+  try {
+    await navigator.clipboard.writeText(weekShareText());
+    const msg = document.getElementById('share-msg');
+    msg.style.display = 'block';
+    setTimeout(() => { msg.style.display = 'none'; }, 2500);
+  } catch (e) {}
+}
+
+function closeShare() { document.getElementById('share-overlay').classList.remove('open'); }
+
+// ─── Need help now ────────────────────────────────────────────
+function openHelp()  { document.getElementById('help-overlay').classList.add('open'); }
+function closeHelp() { document.getElementById('help-overlay').classList.remove('open'); }
 
 // ─── Mood ─────────────────────────────────────────────────────
 function selectMood(v, l) {

@@ -13,3 +13,6 @@ node_modules/
 .swarm/
 ruvector.db
 true-app/
+
+# Local Netlify folder
+.netlify
