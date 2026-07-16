@@ -1359,7 +1359,7 @@ function obPin(n) {
     if (obPinEntry.length === 4) {
       setTimeout(() => {
         obPinStep = 2;
-        obPinEntry = [];
+        // obPinEntry is kept — the confirm step compares against it
         updateObDots();
         document.getElementById('ob-pin-hint').textContent = 'Enter it again to confirm';
       }, 300);
