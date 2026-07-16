@@ -70,7 +70,7 @@ export default async (req) => {
   });
 
   if (!upstream.ok) {
-    return Response.json({ error: 'upstream' }, { status: 502 });
+    return Response.json({ error: 'upstream', upstreamStatus: upstream.status }, { status: 502 });
   }
 
   const data = await upstream.json();
