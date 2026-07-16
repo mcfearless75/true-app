@@ -33,7 +33,7 @@ Demo account for stakeholder walkthroughs: `index.html?demo=1` — loads a pre-p
 | **Journal** | Age-adaptive rotating prompts (10–13 / 14–16 / 17+), full history |
 | **Letter to Future Me** | Write to yourself, sealed until a chosen age (18/21/25) |
 | **About Me** | Values, goals, self-knowledge note, data export |
-| **Milestones** | Add and view personal milestones by category |
+| **Milestones** | Personal milestones by category, with optional photo and voice-note memories (memory box) |
 | **Journey** | Unified filterable timeline of everything |
 | **Share my week** | User-initiated, mood-only summary — never notes, journal or letters |
 | **Need help now** | Static signposting (Childline, Shout, Samaritans, Papyrus) — no tracking |
@@ -44,7 +44,7 @@ Installable as a PWA (manifest + service worker, works offline after first load)
 
 ## Privacy & security
 
-- All data lives in `localStorage` on the device. No API calls, no analytics, no server.
+- All data lives on the device — text in `localStorage`, photos and voice notes in IndexedDB. No API calls, no analytics, no server.
 - The PIN is never stored — only a per-device salted SHA-256 hash.
 - Repeated wrong PIN attempts trigger a 30-second lockout.
 - **Download my everything** (About Me) exports the user's full story as JSON — a GDPR right, and continuity for care leavers.
