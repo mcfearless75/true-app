@@ -1,4 +1,10 @@
 # True — Netlify config
+
+[build]
+  publish = "."
+
+[functions]
+  directory = "netlify/functions"
 # Security headers. The app is a single self-contained file: no external
 # scripts, no API calls, no analytics. CSP locks that down at the edge.
 

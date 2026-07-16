@@ -371,6 +371,19 @@
       color: #C94F35; border-color: #C94F35;
     }
 
+    /* Calm space — breathing circle */
+    .breath-circle {
+      width: 130px; height: 130px; border-radius: 50%;
+      background: var(--trlt); border: 2px solid var(--tr);
+      margin: 22px auto; display: flex; align-items: center; justify-content: center;
+      transition: transform 4s ease-in-out;
+    }
+    .breath-circle.grow { transform: scale(1.45); }
+    @media (prefers-reduced-motion: reduce) {
+      .breath-circle { transition: none; }
+      .breath-circle.grow { transform: none; background: var(--glow); }
+    }
+
     .btn-sm {
       padding: 7px 13px;
       font-size: 12px;
@@ -777,6 +790,8 @@
     <div id="home-milestone"></div>
 
     <div style="text-align:center;margin-top:30px;padding-bottom:8px">
+      <button class="link-quiet" onclick="openCalm()">Take a minute</button>
+      <span style="color:var(--text3);font-size:13px"> &middot; </span>
       <button class="link-quiet" onclick="openHelp()">Need to talk to someone right now?</button>
     </div>
   </div>
@@ -797,6 +812,36 @@
       <div id="share-msg" style="font-size:13px;color:var(--tr);margin-top:10px;display:none">Copied — paste it wherever you like.</div>
       <div style="text-align:center;margin-top:14px">
         <button class="link-quiet" onclick="closeShare()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAKE A MINUTE — calm space. Static, offline, no tracking. -->
+  <div class="overlay" id="calm-overlay" onclick="if(event.target===this)closeCalm()">
+    <div class="overlay-card">
+      <div class="page-title" style="font-size:20px">Take a minute</div>
+      <div style="font-size:14px;color:var(--text2);line-height:1.6;margin:8px 0 10px">
+        When everything's loud, this brings you back to the room.
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:6px">
+        <button class="pill active" id="calm-tab-breathe" onclick="calmTab('breathe')">Breathe</button>
+        <button class="pill" id="calm-tab-ground" onclick="calmTab('ground')">Notice</button>
+      </div>
+      <div id="calm-breathe">
+        <div class="breath-circle" id="breath-circle">
+          <span id="breath-label" style="font-size:14px;color:var(--trdark);font-weight:600">Ready?</span>
+        </div>
+        <div style="font-size:13px;color:var(--text3);text-align:center;margin-bottom:14px">In through your nose, out through your mouth. Follow the circle.</div>
+        <button class="btn-primary" style="width:100%" id="breath-btn" onclick="toggleBreath()">Start</button>
+      </div>
+      <div id="calm-ground" style="display:none">
+        <div id="ground-step" style="text-align:center;padding:18px 0 6px;min-height:96px">
+          <div style="font-size:14px;color:var(--text2);line-height:1.6">Five senses, one at a time. No rush at all.</div>
+        </div>
+        <button class="btn-primary" style="width:100%" id="ground-btn" onclick="groundNext()">Start</button>
+      </div>
+      <div style="text-align:center;margin-top:14px">
+        <button class="link-quiet" onclick="closeCalm()">Close</button>
       </div>
     </div>
   </div>
@@ -873,6 +918,9 @@
     </div>
 
     <div id="mood-extra" style="display:none;margin-top:16px">
+      <div id="calm-nudge" style="display:none;margin-bottom:12px;font-size:13px;color:var(--text2)">
+        Rough one. <button class="link-quiet" style="color:var(--tr)" onclick="openCalm()">Want to take a minute first?</button>
+      </div>
       <div class="section-label" style="margin-top:0">ANYTHING BEHIND THAT? (optional — stays private)</div>
       <textarea id="mood-note" placeholder="A few words is enough."></textarea>
       <div class="btn-row">
@@ -896,6 +944,8 @@
         <button class="btn-primary" onclick="saveJournal()">Save</button>
       </div>
     </div>
+
+    <div class="card-soft" id="journal-reflection" style="display:none;margin-top:12px;border-left:3px solid var(--tr)"></div>
 
     <div class="section-label">PAST ENTRIES</div>
     <div id="journal-list"></div>
@@ -921,6 +971,16 @@
     <div style="margin-top:10px;display:flex;align-items:center;gap:12px">
       <button class="btn-primary" onclick="saveSelfNote()">Save</button>
       <span id="self-saved-msg" style="font-size:13px;color:var(--tr);display:none">Saved.</span>
+    </div>
+
+    <div class="section-label">A THOUGHT BACK (OPTIONAL)</div>
+    <div class="card-soft">
+      <div style="font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:12px">
+        When you save a journal entry, True can offer a short thought back on what you wrote.
+        Your entry is used once to write the reply, then it's gone — never stored anywhere, never seen by anyone.
+        This is off unless you turn it on.
+      </div>
+      <button class="btn-secondary" id="reflect-toggle" onclick="toggleReflect()">Turn on</button>
     </div>
 
     <div class="section-label">MY DATA</div>
@@ -1013,6 +1073,12 @@ No one else will read this. It locks until the date you choose."></textarea>
   <div class="view" id="view-journey">
     <div class="page-title">My Journey</div>
     <div class="page-sub">Everything you've recorded, in one place.</div>
+
+    <div class="card-soft" id="patterns-card" style="display:none;margin-bottom:16px">
+      <div class="section-label" style="margin-top:0;color:var(--trdark)">YOUR PATTERNS</div>
+      <div id="patterns-body"></div>
+      <div style="font-size:12px;color:var(--text3);margin-top:10px">Worked out on this device. Only you see this.</div>
+    </div>
 
     <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
       <button class="btn-secondary btn-sm" onclick="showView('milestones')" style="display:inline-flex;align-items:center;gap:6px">
@@ -1180,6 +1246,7 @@ let S = {
   selectedValues: [],
   goals: [],
   selfNote: '',
+  aiReflect: false,  // "A thought back" — off unless the user turns it on
 };
 
 // Demo data — loads ONLY with ?demo=1 in the URL. Real users start clean.
@@ -1497,6 +1564,7 @@ function selectMood(v, l) {
   S.selectedMoodLabel = l;
   document.querySelectorAll('.mood-row[data-mv]').forEach(r => r.classList.toggle('selected', parseInt(r.dataset.mv) === v));
   document.getElementById('mood-extra').style.display = 'block';
+  document.getElementById('calm-nudge').style.display = v <= 2 ? 'block' : 'none';
 }
 
 function saveMood() {
@@ -1544,8 +1612,10 @@ function saveJournal() {
   if (!t) return;
   const now = new Date();
   const d = now.toLocaleDateString('en-GB', {day:'numeric', month:'short'});
-  S.journals.push({d, p: currentPrompt(), t, ts: Date.now()});
+  const promptUsed = currentPrompt();
+  S.journals.push({d, p: promptUsed, t, ts: Date.now()});
   document.getElementById('journal-text').value = '';
+  if (S.aiReflect) requestReflection(t, promptUsed);
   saveState();
   renderJournal();
 }
@@ -1558,6 +1628,7 @@ function renderMe() {
   `).join('');
   renderGoals();
   document.getElementById('self-note-text').value = S.selfNote || '';
+  updateReflectToggle();
 }
 
 function toggleValue(v) {
@@ -1635,6 +1706,177 @@ function saveSelfNote() {
   const msg = document.getElementById('self-saved-msg');
   msg.style.display = 'inline';
   setTimeout(() => msg.style.display = 'none', 2000);
+}
+
+// ─── Your patterns — computed on-device, never sent anywhere ──
+function checkinStreak() {
+  const days = new Set(S.moods.map(m => new Date(m.ts).toDateString()));
+  let streak = 0;
+  const d = new Date();
+  if (!days.has(d.toDateString())) d.setDate(d.getDate() - 1); // today not logged yet doesn't break it
+  while (days.has(d.toDateString())) { streak++; d.setDate(d.getDate() - 1); }
+  return streak;
+}
+
+function renderPatterns() {
+  const card = document.getElementById('patterns-card');
+  if (S.moods.length < 3) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+
+  const WEEK = 7 * 86400000;
+  const now = Date.now();
+  const avg = a => a.length ? a.reduce((s, m) => s + m.v, 0) / a.length : null;
+  const thisWeek = avg(S.moods.filter(m => now - m.ts < WEEK));
+  const lastWeek = avg(S.moods.filter(m => now - m.ts >= WEEK && now - m.ts < 2 * WEEK));
+
+  const rows = [];
+  const streak = checkinStreak();
+  if (streak >= 2) rows.push(`You're on a <b>${streak}-day</b> check-in streak.`);
+
+  if (thisWeek !== null && lastWeek !== null) {
+    const diff = thisWeek - lastWeek;
+    rows.push(diff > 0.3 ? "This week has felt brighter than last week."
+            : diff < -0.3 ? "This week has been heavier than last — be kind to yourself."
+            : "This week has felt about the same as last week.");
+  }
+
+  const byDay = {};
+  S.moods.forEach(m => {
+    const wd = new Date(m.ts).toLocaleDateString('en-GB', { weekday: 'long' });
+    (byDay[wd] = byDay[wd] || []).push(m.v);
+  });
+  let bestDay = null, bestAvg = 0;
+  Object.entries(byDay).forEach(([day, vs]) => {
+    if (vs.length < 2) return;
+    const a = vs.reduce((s, v) => s + v, 0) / vs.length;
+    if (a > bestAvg) { bestAvg = a; bestDay = day; }
+  });
+  if (bestDay && bestAvg >= 3.5) rows.push(`<b>${bestDay}s</b> tend to be your best days.`);
+
+  rows.push(`<span style="color:var(--text2)">${S.moods.length} check-ins &middot; ${S.journals.length} journal entries &middot; ${S.milestones.length} milestones</span>`);
+
+  document.getElementById('patterns-body').innerHTML =
+    rows.map(r => `<div style="font-size:14px;color:var(--text);line-height:1.8">${r}</div>`).join('');
+}
+
+// ─── Take a minute — calm space ───────────────────────────────
+let breathTimer = null;
+let breathPhase = -1;
+const BREATH_PHASES = [
+  { label: 'Breathe in', secs: 4, grow: true },
+  { label: 'Hold',       secs: 4, grow: true },
+  { label: 'Breathe out',secs: 4, grow: false },
+  { label: 'Hold',       secs: 4, grow: false },
+];
+
+function toggleBreath() {
+  if (breathTimer) { stopBreath(); return; }
+  document.getElementById('breath-btn').textContent = 'Stop';
+  breathPhase = -1;
+  nextBreathPhase();
+}
+
+function nextBreathPhase() {
+  breathPhase = (breathPhase + 1) % BREATH_PHASES.length;
+  const p = BREATH_PHASES[breathPhase];
+  document.getElementById('breath-circle').classList.toggle('grow', p.grow);
+  document.getElementById('breath-label').textContent = p.label;
+  breathTimer = setTimeout(nextBreathPhase, p.secs * 1000);
+}
+
+function stopBreath() {
+  clearTimeout(breathTimer);
+  breathTimer = null;
+  document.getElementById('breath-circle').classList.remove('grow');
+  document.getElementById('breath-label').textContent = 'Ready?';
+  document.getElementById('breath-btn').textContent = 'Start';
+}
+
+const GROUND_STEPS = [
+  { n: 5, what: 'things you can see',  hint: 'Look around slowly. Name them in your head.' },
+  { n: 4, what: 'things you can feel', hint: 'Your feet on the floor. The fabric of your sleeve.' },
+  { n: 3, what: 'things you can hear', hint: 'Near or far. Let them come to you.' },
+  { n: 2, what: 'things you can smell',hint: 'Or two smells you like, if nothing is around.' },
+  { n: 1, what: 'thing you can taste', hint: 'Or one good thing about yourself. That counts.' },
+];
+let groundIdx = -1;
+
+function groundNext() {
+  groundIdx++;
+  const el = document.getElementById('ground-step');
+  const btn = document.getElementById('ground-btn');
+  if (groundIdx >= GROUND_STEPS.length) {
+    el.innerHTML = '<div style="font-size:15px;color:var(--text);line-height:1.6;padding-top:14px">Nice. You&rsquo;re back in the room.</div>';
+    btn.textContent = 'Start again';
+    groundIdx = -1;
+    return;
+  }
+  const s = GROUND_STEPS[groundIdx];
+  el.innerHTML = `
+    <div style="font-size:30px;font-weight:700;color:var(--tr)">${s.n}</div>
+    <div style="font-size:16px;color:var(--text);margin-top:2px">${s.what}</div>
+    <div style="font-size:13px;color:var(--text3);margin-top:8px;line-height:1.5">${s.hint}</div>`;
+  btn.textContent = groundIdx === GROUND_STEPS.length - 1 ? 'Done' : 'Next';
+}
+
+function groundReset() {
+  groundIdx = -1;
+  document.getElementById('ground-step').innerHTML =
+    '<div style="font-size:14px;color:var(--text2);line-height:1.6">Five senses, one at a time. No rush at all.</div>';
+  document.getElementById('ground-btn').textContent = 'Start';
+}
+
+function calmTab(t) {
+  document.getElementById('calm-breathe').style.display = t === 'breathe' ? 'block' : 'none';
+  document.getElementById('calm-ground').style.display  = t === 'ground'  ? 'block' : 'none';
+  document.getElementById('calm-tab-breathe').classList.toggle('active', t === 'breathe');
+  document.getElementById('calm-tab-ground').classList.toggle('active', t === 'ground');
+  if (t !== 'breathe') stopBreath();
+}
+
+function openCalm()  { document.getElementById('calm-overlay').classList.add('open'); }
+function closeCalm() {
+  stopBreath();
+  groundReset();
+  document.getElementById('calm-overlay').classList.remove('open');
+}
+
+// ─── A thought back — optional AI reflection ──────────────────
+// Opt-in only. The entry is sent once to a serverless function that
+// writes a short reply and stores nothing. Any failure = silent skip.
+function toggleReflect() {
+  S.aiReflect = !S.aiReflect;
+  saveState();
+  updateReflectToggle();
+}
+
+function updateReflectToggle() {
+  const btn = document.getElementById('reflect-toggle');
+  btn.textContent = S.aiReflect ? 'Turn off' : 'Turn on';
+  btn.style.color = S.aiReflect ? 'var(--tr)' : '';
+}
+
+async function requestReflection(entry, promptUsed) {
+  const el = document.getElementById('journal-reflection');
+  try {
+    el.style.display = 'block';
+    el.innerHTML = '<div style="font-size:13px;color:var(--text3)">A thought back is on its way&hellip;</div>';
+    const r = await fetch('/.netlify/functions/reflect', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ entry, prompt: promptUsed, ageBand: S.age }),
+    });
+    if (!r.ok) throw new Error('unavailable');
+    const data = await r.json();
+    if (!data.reflection) throw new Error('empty');
+    const safe = data.reflection.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    el.innerHTML = `
+      <div class="section-label" style="margin-top:0">A THOUGHT BACK</div>
+      <div style="font-size:14px;color:var(--text);line-height:1.65">${safe}</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:10px">Written just now, then forgotten. Your entry lives only on this device.</div>`;
+  } catch (e) {
+    el.style.display = 'none';
+  }
 }
 
 // ─── Memory box: media storage ────────────────────────────────
@@ -1996,6 +2238,7 @@ function setJourneyFilter(f) {
 }
 
 function renderJourney() {
+  renderPatterns();
   const all = [];
   S.moods.forEach(m => all.push({type:'mood', d:m.d, data:m, ts:m.ts||0}));
   S.journals.forEach(j => all.push({type:'journal', d:j.d, data:j, ts:j.ts||0}));

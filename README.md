@@ -37,6 +37,9 @@ Demo account for stakeholder walkthroughs: `index.html?demo=1` — loads a pre-p
 | **Journey** | Unified filterable timeline of everything |
 | **Share my week** | User-initiated, mood-only summary — never notes, journal or letters |
 | **Need help now** | Static signposting (Childline, Shout, Samaritans, Papyrus) — no tracking |
+| **Your patterns** | On-device mood insights: streak, week trend, best day (Journey) |
+| **Take a minute** | Calm space: box breathing + 5-4-3-2-1 grounding, offered on low check-ins |
+| **A thought back** | Opt-in AI reflection on journal entries via serverless proxy — entry processed once, never stored |
 
 Installable as a PWA (manifest + service worker, works offline after first load).
 
@@ -64,10 +67,21 @@ Bump `CACHE` in `sw.js` on every deploy.
 
 ---
 
+## AI reflections setup
+
+"A thought back" needs `ANTHROPIC_API_KEY` set in the Netlify environment:
+
+```bash
+netlify env:set ANTHROPIC_API_KEY <your-key>
+```
+
+Without the key the endpoint returns 503 and the app silently skips the feature.
+The function (`netlify/functions/reflect.mjs`) is stateless — entries are processed once and never stored or logged.
+
 ## Roadmap
 
 - [ ] Formspree ID into `feedback.html`
-- [ ] AI journalling via Anthropic API (serverless proxy — entries processed and discarded, never stored)
+- [ ] Leaving-care export pack (18+ mode)
 - [ ] Capacitor.js wrapper for iOS/Android (after beta validation)
 
 ---
