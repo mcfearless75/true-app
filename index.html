@@ -681,6 +681,9 @@
         <strong>This is private.</strong> No one else can see what you write here — not your carer, not your social worker, not anyone. It's yours.
       </div>
       <button class="btn-primary" style="width:100%" onclick="obNext(2)">Get started</button>
+      <div style="text-align:center;margin-top:16px">
+        <button class="link-quiet" onclick="openRestore()">I had True before — bring my story back</button>
+      </div>
     </div>
 
     <!-- Step 2: Name -->
@@ -812,6 +815,39 @@
       <div id="share-msg" style="font-size:13px;color:var(--tr);margin-top:10px;display:none">Copied — paste it wherever you like.</div>
       <div style="text-align:center;margin-top:14px">
         <button class="link-quiet" onclick="closeShare()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BACKUP CODE — shown once on enable, and on request -->
+  <div class="overlay" id="code-overlay">
+    <div class="overlay-card">
+      <div class="page-title" style="font-size:20px">Your recovery code</div>
+      <div style="font-size:14px;color:var(--text2);line-height:1.6;margin:8px 0 14px">
+        This code is the <strong>only</strong> key to your backup. Write it down or save it somewhere safe —
+        without it, nobody can bring your story back. Not even us. That's the point.
+      </div>
+      <div class="card-soft" style="text-align:center;font-size:17px;font-weight:700;letter-spacing:0.06em;color:var(--trdark);user-select:all" id="code-display"></div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="btn-secondary" style="flex:1" onclick="copyBackupCode()">Copy code</button>
+        <button class="btn-primary" style="flex:1" onclick="confirmCodeSaved()">I've saved it</button>
+      </div>
+      <div id="code-msg" style="font-size:13px;color:var(--tr);margin-top:10px;display:none">Copied.</div>
+    </div>
+  </div>
+
+  <!-- RESTORE — new device, recovery code in, story back -->
+  <div class="overlay" id="restore-overlay" onclick="if(event.target===this)closeRestore()">
+    <div class="overlay-card">
+      <div class="page-title" style="font-size:20px">Bring my story back</div>
+      <div style="font-size:14px;color:var(--text2);line-height:1.6;margin:8px 0 14px">
+        Enter the recovery code you saved when you turned on backup. Your story unlocks only on this device.
+      </div>
+      <input type="text" id="restore-code" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX" autocapitalize="characters" autocomplete="off" spellcheck="false" style="text-align:center;letter-spacing:0.06em;font-weight:600;margin-bottom:12px">
+      <button class="btn-primary" style="width:100%" id="restore-btn" onclick="doRestore()">Restore</button>
+      <div id="restore-msg" style="font-size:13px;color:var(--text2);margin-top:10px;text-align:center;display:none"></div>
+      <div style="text-align:center;margin-top:14px">
+        <button class="link-quiet" onclick="closeRestore()">Close</button>
       </div>
     </div>
   </div>
@@ -989,6 +1025,26 @@
         Everything in True is yours. Download a copy any time — your moods, journal, milestones and letters, all in one file. Nothing is ever sent anywhere.
       </div>
       <button class="btn-primary" onclick="exportData()">Download my everything</button>
+    </div>
+
+    <div class="section-label">BACKUP (OPTIONAL)</div>
+    <div class="card-soft">
+      <div id="backup-off">
+        <div style="font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:12px">
+          Phones get lost and broken. Backup keeps a scrambled copy of your story that only a code you hold can unlock.
+          We can't read it. Nobody can — not us, not a court, not anyone. Without your code it's noise.
+        </div>
+        <button class="btn-primary" onclick="enableBackup()">Turn on backup</button>
+      </div>
+      <div id="backup-on" style="display:none">
+        <div style="font-size:14px;color:var(--text);margin-bottom:4px">Backup is on.</div>
+        <div style="font-size:13px;color:var(--text3);margin-bottom:12px" id="backup-status"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn-secondary" onclick="doBackup(true)">Back up now</button>
+          <button class="btn-secondary" onclick="showBackupCode()">Show my code</button>
+          <button class="btn-secondary" onclick="disableBackup()">Turn off</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1247,6 +1303,8 @@ let S = {
   goals: [],
   selfNote: '',
   aiReflect: false,  // "A thought back" — off unless the user turns it on
+  backupCode: '',    // recovery code; deriving key + id happens on demand
+  backupLast: 0,
 };
 
 // Demo data — loads ONLY with ?demo=1 in the URL. Real users start clean.
@@ -1278,8 +1336,11 @@ const DEMO_DATA = {
 };
 
 // ─── localStorage persistence ─────────────────────────────────
+let backupDirty = false;
+
 function saveState() {
   try { localStorage.setItem('true_state', JSON.stringify(S)); } catch(e) {}
+  backupDirty = true;
 }
 
 function loadState() {
@@ -1629,6 +1690,7 @@ function renderMe() {
   renderGoals();
   document.getElementById('self-note-text').value = S.selfNote || '';
   updateReflectToggle();
+  renderBackupCard();
 }
 
 function toggleValue(v) {
@@ -1669,7 +1731,7 @@ function deleteGoal(i) {
 // including memory box photos and voice notes as data URLs.
 // PIN material and transient UI state are excluded.
 async function exportData() {
-  const { pin, pinHash, pinSalt, pinFails, pinLockUntil,
+  const { pin, pinHash, pinSalt, pinFails, pinLockUntil, backupCode, backupLast,
           selectedMoodVal, selectedMoodLabel, selectedMsCat, journeyFilter, ...mine } = S;
   const payload = {
     app: 'True',
@@ -1878,6 +1940,203 @@ async function requestReflection(entry, promptUsed) {
     el.style.display = 'none';
   }
 }
+
+// ─── Zero-knowledge backup ────────────────────────────────────
+// Everything is encrypted on this device with a key derived from a
+// recovery code that never leaves it. The server stores ciphertext it
+// cannot read, filed under an id also derived from the code. The code
+// is the only key — losing it means the backup is unrecoverable, by design.
+const BACKUP_PBKDF2_ITERS = 600000;
+const BACKUP_AUTO_MS = 90000;
+
+function generateRecoveryCode() {
+  const alphabet = 'ABCDEFGHJKMNPQRSTVWXYZ23456789'; // no 0/O/1/I/L/U
+  const bytes = crypto.getRandomValues(new Uint8Array(20));
+  let s = '';
+  for (let i = 0; i < 20; i++) s += alphabet[bytes[i] % alphabet.length];
+  return s.match(/.{4}/g).join('-');
+}
+
+function normaliseCode(input) {
+  return (input || '').toUpperCase().replace(/[^A-Z2-9]/g, '');
+}
+
+const hex = buf => Array.from(new Uint8Array(buf), b => b.toString(16).padStart(2, '0')).join('');
+
+// One derivation, split: bytes 0-15 → backup id, bytes 16-47 → AES-256 key
+async function deriveBackupMaterial(code) {
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(normaliseCode(code)), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt: new TextEncoder().encode('true-backup-v1'), iterations: BACKUP_PBKDF2_ITERS, hash: 'SHA-256' },
+    base, 384
+  );
+  const bytes = new Uint8Array(bits);
+  const id = hex(bytes.slice(0, 16).buffer);
+  const key = await crypto.subtle.importKey('raw', bytes.slice(16, 48), 'AES-GCM', false, ['encrypt', 'decrypt']);
+  return { id, key };
+}
+
+async function buildBackupPayload() {
+  const state = { ...S };
+  delete state.selectedMoodVal; delete state.selectedMoodLabel; delete state.selectedMsCat;
+  let media = [];
+  try {
+    const all = await mediaAll();
+    media = (await Promise.all(all.map(rec => new Promise(res => {
+      const fr = new FileReader();
+      fr.onload = () => res({ id: rec.id, kind: rec.kind, type: rec.type, dataUrl: fr.result });
+      fr.onerror = () => res(null);
+      fr.readAsDataURL(rec.blob);
+    })))).filter(Boolean);
+  } catch (e) {}
+  return JSON.stringify({ v: 1, state, media });
+}
+
+function bufToB64(buf) {
+  const bytes = new Uint8Array(buf);
+  let s = '';
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    s += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(s);
+}
+
+function b64ToBuf(b64) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
+
+function dataUrlToBlob(u) {
+  const [head, b64] = u.split(',');
+  const mime = (head.match(/data:(.*?)[;,]/) || [])[1] || 'application/octet-stream';
+  return new Blob([b64ToBuf(b64)], { type: mime });
+}
+
+async function doBackup(manual) {
+  if (!S.backupCode || !navigator.onLine) return;
+  const statusEl = document.getElementById('backup-status');
+  try {
+    if (manual && statusEl) statusEl.textContent = 'Backing up…';
+    const { id, key } = await deriveBackupMaterial(S.backupCode);
+    const plaintext = new TextEncoder().encode(await buildBackupPayload());
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext);
+    const r = await fetch('/.netlify/functions/backup', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id, iv: bufToB64(iv.buffer), data: bufToB64(cipher) }),
+    });
+    if (!r.ok) throw new Error('backup failed: ' + r.status);
+    S.backupLast = Date.now();
+    saveState();
+    backupDirty = false;
+    renderBackupCard();
+  } catch (e) {
+    if (manual && statusEl) statusEl.textContent = "Couldn't back up just now — it'll retry on its own.";
+  }
+}
+
+function renderBackupCard() {
+  const off = document.getElementById('backup-off');
+  const on = document.getElementById('backup-on');
+  if (!off) return;
+  const enabled = !!S.backupCode;
+  off.style.display = enabled ? 'none' : 'block';
+  on.style.display = enabled ? 'block' : 'none';
+  if (enabled) {
+    document.getElementById('backup-status').textContent = S.backupLast
+      ? 'Last backed up ' + new Date(S.backupLast).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+      : 'First backup pending.';
+  }
+}
+
+function enableBackup() {
+  S.backupCode = generateRecoveryCode();
+  saveState();
+  document.getElementById('code-display').textContent = S.backupCode;
+  document.getElementById('code-overlay').classList.add('open');
+}
+
+function showBackupCode() {
+  if (!S.backupCode) return;
+  document.getElementById('code-display').textContent = S.backupCode;
+  document.getElementById('code-overlay').classList.add('open');
+}
+
+async function copyBackupCode() {
+  try {
+    await navigator.clipboard.writeText(S.backupCode);
+    const msg = document.getElementById('code-msg');
+    msg.style.display = 'block';
+    setTimeout(() => { msg.style.display = 'none'; }, 2000);
+  } catch (e) {}
+}
+
+function confirmCodeSaved() {
+  document.getElementById('code-overlay').classList.remove('open');
+  renderBackupCard();
+  doBackup(true);
+}
+
+async function disableBackup() {
+  if (!confirm('Turn off backup? The scrambled copy is deleted and only this device keeps your story.')) return;
+  try {
+    const { id } = await deriveBackupMaterial(S.backupCode);
+    await fetch('/.netlify/functions/backup?id=' + id, { method: 'DELETE' });
+  } catch (e) {}
+  S.backupCode = '';
+  S.backupLast = 0;
+  saveState();
+  renderBackupCard();
+}
+
+// ─── Restore on a new device ──────────────────────────────────
+function openRestore()  { document.getElementById('restore-overlay').classList.add('open'); }
+function closeRestore() { document.getElementById('restore-overlay').classList.remove('open'); }
+
+async function doRestore() {
+  const msg = document.getElementById('restore-msg');
+  const btn = document.getElementById('restore-btn');
+  const raw = document.getElementById('restore-code').value;
+  if (normaliseCode(raw).length !== 20) {
+    msg.style.display = 'block';
+    msg.textContent = 'That code doesn\'t look complete — it has 20 letters and numbers.';
+    return;
+  }
+  btn.disabled = true;
+  msg.style.display = 'block';
+  msg.textContent = 'Unlocking…';
+  try {
+    const { id, key } = await deriveBackupMaterial(raw);
+    const r = await fetch('/.netlify/functions/backup?id=' + id);
+    if (r.status === 404) throw new Error('notfound');
+    if (!r.ok) throw new Error('server');
+    const rec = await r.json();
+    const plainBuf = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: new Uint8Array(b64ToBuf(rec.iv)) }, key, b64ToBuf(rec.data)
+    );
+    const payload = JSON.parse(new TextDecoder().decode(plainBuf));
+    if (!payload || payload.v !== 1 || !payload.state) throw new Error('corrupt');
+    // media back into IndexedDB first, then state, then a clean boot
+    for (const m of (payload.media || [])) {
+      try { await mediaPut({ id: m.id, kind: m.kind, type: m.type, blob: dataUrlToBlob(m.dataUrl) }); } catch (e) {}
+    }
+    localStorage.setItem('true_state', JSON.stringify(payload.state));
+    msg.textContent = 'Got it. Welcome back.';
+    setTimeout(() => location.reload(), 900);
+  } catch (e) {
+    btn.disabled = false;
+    msg.textContent = e.message === 'notfound'
+      ? 'No backup found for that code — check it carefully and try again.'
+      : 'That didn\'t work — check the code and try again.';
+  }
+}
+
+// Auto-backup: quietly, whenever something changed
+setInterval(() => { if (S.backupCode && backupDirty) doBackup(false); }, BACKUP_AUTO_MS);
 
 // ─── Memory box: media storage ────────────────────────────────
 // Photos and voice notes live in IndexedDB on the device — same
