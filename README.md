@@ -40,6 +40,7 @@ Demo account for stakeholder walkthroughs: `index.html?demo=1` — loads a pre-p
 | **Your patterns** | On-device mood insights: streak, week trend, best day (Journey) |
 | **Take a minute** | Calm space: box breathing + 5-4-3-2-1 grounding, offered on low check-ins |
 | **A thought back** | Opt-in AI reflection on journal entries via serverless proxy — entry processed once, never stored |
+| **Backup** | Zero-knowledge encrypted backup: AES-256-GCM, key derived (PBKDF2-600k) from a recovery code that never leaves the device. Server stores unreadable ciphertext. Restore anywhere with the code |
 
 Installable as a PWA (manifest + service worker, works offline after first load).
 
@@ -51,6 +52,7 @@ Installable as a PWA (manifest + service worker, works offline after first load)
 - The PIN is never stored — only a per-device salted SHA-256 hash.
 - Repeated wrong PIN attempts trigger a 30-second lockout.
 - **Download my everything** (About Me) exports the user's full story as JSON — a GDPR right, and continuity for care leavers.
+- Optional backup is zero-knowledge: encrypted on-device, the server holds only ciphertext filed under an id derived from the recovery code. No accounts, no names, nothing readable to hand over.
 - Security headers (CSP, HSTS, no-referrer, frame-deny) set via `netlify.toml`.
 - UK GDPR / ICO Children's Code by design: no data ever leaves the device.
 
