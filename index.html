@@ -1,0 +1,1760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>True — Your words. Your truth.</title>
+  <meta name="description" content="True is your private space to track how you feel, reflect, and see how far you've come.">
+  <meta name="theme-color" content="#1A7A6E">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+
+  <!-- PWA basics -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="True">
+
+  <style>
+    /* ─── Reset & Base ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --tr:     #1A7A6E;
+      --trlt:   #E6F5F4;
+      --trdark: #0F5349;
+      --glow:   #25A99A;
+      --gllt:   #E6F2FA;
+      --acc:    #1D6FA4;
+      --ash:    #2C2C2A;
+      --warm:   #F1EFE8;
+      --text:   #1a1a18;
+      --text2:  #5f5e5a;
+      --text3:  #888780;
+      --bg:     #ffffff;
+      --bg2:    #f7f6f3;
+      --bg3:    #f1efe8;
+      --border: rgba(0,0,0,0.10);
+      --border2: rgba(0,0,0,0.18);
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 2px 12px rgba(0,0,0,0.06);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --text:   #f0ede8;
+        --text2:  #a09d97;
+        --text3:  #6b6965;
+        --bg:     #1a1917;
+        --bg2:    #222120;
+        --bg3:    #2a2927;
+        --border: rgba(255,255,255,0.10);
+        --border2: rgba(255,255,255,0.18);
+        --trlt:   #0d2e2b;
+        --gllt:   #0d2030;
+      }
+    }
+
+    html, body {
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg3);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── App Shell ─────────────────────────────────────────────── */
+    #app {
+      max-width: 430px;
+      margin: 0 auto;
+      background: var(--bg);
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      box-shadow: var(--shadow);
+    }
+
+    /* ─── Header ─────────────────────────────────────────────────── */
+    #header {
+      padding: 14px 16px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--bg);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+
+    .true-logo {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      flex: 1;
+    }
+
+    .true-wordmark {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: var(--text);
+    }
+
+    .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--trlt);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--tr);
+      flex-shrink: 0;
+    }
+
+    .lock-btn {
+      font-size: 11px;
+      color: var(--text3);
+      cursor: pointer;
+      padding: 4px 9px;
+      border: 1px solid var(--border2);
+      border-radius: 20px;
+      background: none;
+      font-family: inherit;
+    }
+
+    .lock-btn:hover { background: var(--bg2); }
+
+    /* ─── Views ──────────────────────────────────────────────────── */
+    .view {
+      display: none;
+      flex: 1;
+      padding: 1.25rem 1rem 1.5rem;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .view.active { display: block; }
+
+    /* ─── Nav ────────────────────────────────────────────────────── */
+    #nav {
+      display: flex;
+      border-top: 1px solid var(--border);
+      background: var(--bg);
+      padding: 6px 0 max(10px, env(safe-area-inset-bottom));
+      position: sticky;
+      bottom: 0;
+    }
+
+    .nav-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 6px 4px;
+      font-size: 10px;
+      color: var(--text3);
+      font-family: inherit;
+      transition: color 0.15s;
+    }
+
+    .nav-btn.active { color: var(--tr); font-weight: 600; }
+    .nav-btn svg { display: block; }
+
+    /* ─── Lock Screen ────────────────────────────────────────────── */
+    #lock-screen {
+      position: absolute;
+      inset: 0;
+      background: var(--bg);
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1.5rem;
+    }
+
+    #lock-screen.hidden { display: none; }
+
+    .lock-brand {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 32px;
+    }
+
+    .lock-wordmark {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      color: var(--text);
+    }
+
+    .lock-tagline {
+      font-size: 13px;
+      color: var(--text2);
+    }
+
+    .pin-dots {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .pin-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 1.5px solid var(--tr);
+      background: transparent;
+      transition: background 0.15s;
+    }
+
+    .pin-dot.filled { background: var(--tr); }
+
+    .pin-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 64px);
+      gap: 12px;
+      justify-content: center;
+      margin-bottom: 14px;
+    }
+
+    .pin-key {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      border: 1px solid var(--border2);
+      background: var(--bg2);
+      font-size: 20px;
+      font-weight: 400;
+      cursor: pointer;
+      font-family: inherit;
+      color: var(--text);
+      transition: background 0.1s, transform 0.08s;
+    }
+
+    .pin-key:active { background: var(--bg3); transform: scale(0.95); }
+    .pin-key.del { font-size: 16px; }
+    .pin-key.empty { background: none; border: none; cursor: default; }
+
+    .pin-hint {
+      font-size: 12px;
+      color: var(--text3);
+      text-align: center;
+    }
+
+    /* ─── Typography ─────────────────────────────────────────────── */
+    .page-title {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .page-sub {
+      font-size: 13px;
+      color: var(--text2);
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      color: var(--text3);
+      margin-bottom: 8px;
+      margin-top: 20px;
+    }
+
+    .section-label:first-child { margin-top: 0; }
+
+    /* ─── Cards ──────────────────────────────────────────────────── */
+    .card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      margin-bottom: 10px;
+    }
+
+    .card-soft {
+      background: var(--bg2);
+      border-radius: var(--radius);
+      padding: 1rem;
+      margin-bottom: 10px;
+    }
+
+    .card-true {
+      background: var(--trlt);
+      border-radius: var(--radius);
+      padding: 1rem;
+      margin-bottom: 10px;
+    }
+
+    /* ─── Buttons ────────────────────────────────────────────────── */
+    .btn-primary {
+      background: var(--tr);
+      color: #fff;
+      border: none;
+      padding: 11px 18px;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.1s, transform 0.08s;
+    }
+
+    .btn-primary:hover { background: var(--trdark); }
+    .btn-primary:active { transform: scale(0.98); }
+
+    .btn-secondary {
+      background: none;
+      border: 1px solid var(--border2);
+      padding: 10px 16px;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      cursor: pointer;
+      color: var(--text);
+      font-family: inherit;
+      transition: background 0.1s;
+    }
+
+    .btn-secondary:hover { background: var(--bg2); }
+
+    .btn-sm {
+      padding: 7px 13px;
+      font-size: 12px;
+    }
+
+    /* ─── Form Elements ──────────────────────────────────────────── */
+    textarea, input[type="text"] {
+      width: 100%;
+      padding: 11px 13px;
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 14px;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      transition: border-color 0.15s;
+    }
+
+    textarea:focus, input[type="text"]:focus {
+      outline: none;
+      border-color: var(--tr);
+    }
+
+    textarea { min-height: 110px; resize: vertical; }
+
+    /* ─── Pills / Tags ───────────────────────────────────────────── */
+    .pill {
+      padding: 6px 13px;
+      border: 1px solid var(--border2);
+      border-radius: 20px;
+      font-size: 13px;
+      cursor: pointer;
+      color: var(--text2);
+      background: none;
+      font-family: inherit;
+      transition: all 0.12s;
+    }
+
+    .pill.active {
+      border-color: var(--tr);
+      background: var(--trlt);
+      color: var(--tr);
+      font-weight: 500;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    /* ─── Mood Rows ──────────────────────────────────────────────── */
+    .mood-row {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      padding: 12px 13px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      margin-bottom: 8px;
+      transition: background 0.12s, border-color 0.12s;
+    }
+
+    .mood-row:hover { background: var(--bg2); }
+    .mood-row.selected { border-color: var(--tr); background: var(--trlt); }
+
+    .mood-dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .mood-label { font-size: 14px; font-weight: 500; color: var(--text); }
+    .mood-desc { font-size: 12px; color: var(--text2); margin-top: 1px; }
+
+    /* ─── Timeline ───────────────────────────────────────────────── */
+    .tl-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .tl-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .tl-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-top: 3px;
+      flex-shrink: 0;
+    }
+
+    .tl-line {
+      width: 2px;
+      background: var(--border);
+      flex: 1;
+      min-height: 16px;
+      margin-top: 4px;
+    }
+
+    /* ─── Mood Bar Chart ─────────────────────────────────────────── */
+    .mood-bar-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+      height: 72px;
+      padding: 10px 12px;
+    }
+
+    .mbc-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      height: 100%;
+      justify-content: flex-end;
+    }
+
+    .mbc-bar {
+      width: 100%;
+      max-width: 26px;
+      border-radius: 3px 3px 0 0;
+      min-height: 4px;
+    }
+
+    .mbc-day {
+      font-size: 10px;
+      color: var(--text3);
+      white-space: nowrap;
+    }
+
+    /* ─── Row actions ────────────────────────────────────────────── */
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .btn-row .btn-primary,
+    .btn-row .btn-secondary { flex: 1; }
+
+    /* ─── Goal item ──────────────────────────────────────────────── */
+    .goal-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 13px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 7px;
+    }
+
+    .goal-circle {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      border: 2px solid var(--tr);
+      flex-shrink: 0;
+    }
+
+    .goal-text { font-size: 14px; color: var(--text); flex: 1; }
+
+    .goal-del {
+      font-size: 20px;
+      color: var(--text3);
+      cursor: pointer;
+      line-height: 1;
+      padding: 0 2px;
+      background: none;
+      border: none;
+      font-family: inherit;
+    }
+
+    /* ─── Values grid ────────────────────────────────────────────── */
+    .vals-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    /* ─── Prompt card ────────────────────────────────────────────── */
+    .prompt-text {
+      font-size: 14px;
+      color: var(--text);
+      font-style: italic;
+      line-height: 1.7;
+      margin-bottom: 14px;
+    }
+
+    /* ─── Onboarding ─────────────────────────────────────────────── */
+    #onboarding {
+      position: absolute;
+      inset: 0;
+      background: var(--bg);
+      z-index: 15;
+      display: flex;
+      flex-direction: column;
+      padding: 2rem 1.5rem;
+      overflow-y: auto;
+    }
+
+    #onboarding.hidden { display: none; }
+
+    .ob-step { display: none; }
+    .ob-step.active { display: block; }
+
+    .ob-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 32px;
+    }
+
+    .ob-title {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      margin-bottom: 8px;
+      line-height: 1.2;
+    }
+
+    .ob-sub {
+      font-size: 15px;
+      color: var(--text2);
+      line-height: 1.6;
+      margin-bottom: 28px;
+    }
+
+    .ob-privacy {
+      background: var(--bg2);
+      border-radius: var(--radius);
+      padding: 1rem;
+      margin-bottom: 24px;
+      font-size: 13px;
+      color: var(--text2);
+      line-height: 1.6;
+    }
+
+    .ob-privacy strong { color: var(--text); }
+
+    /* ── Letter to Future Me ── */
+    .tab-row { display:flex; gap:2px; background:var(--bg2); border-radius:10px; padding:3px; margin-bottom:18px; }
+    .tab { flex:1; padding:8px; font-size:13px; font-weight:500; cursor:pointer; border-radius:8px; background:none; border:none; color:var(--text3); font-family:inherit; transition:all .15s; text-align:center; }
+    .tab.active { background:var(--bg); color:var(--text); box-shadow:0 1px 4px rgba(0,0,0,0.08); }
+    .letter-compose { background:var(--bg); border:1px solid rgba(29,111,164,0.3); border-radius:var(--radius); padding:1.25rem; margin-bottom:12px; position:relative; }
+    .letter-compose::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg, var(--acc), var(--tr)); border-radius:var(--radius) var(--radius) 0 0; opacity:.6; }
+    .letter-opening { font-size:14px; color:var(--text2); font-style:italic; margin-bottom:10px; line-height:1.6; }
+    .age-pills { display:flex; gap:6px; flex-wrap:wrap; }
+    .age-pill { padding:7px 14px; border:1px solid var(--border2); border-radius:20px; font-size:13px; cursor:pointer; color:var(--text2); background:none; font-family:inherit; transition:all .12s; }
+    .age-pill.active { border-color:var(--acc); background:var(--gllt); color:var(--acc); font-weight:500; }
+    .locked-letter { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:1rem; margin-bottom:10px; display:flex; gap:12px; align-items:flex-start; }
+    .lock-icon-wrap { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; background:var(--bg2); }
+    .lock-icon-wrap.unlocked { background:var(--gllt); }
+    .letter-status { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600; padding:3px 8px; border-radius:20px; }
+    .status-locked { background:var(--bg2); color:var(--text3); }
+    .status-ready { background:var(--gllt); color:var(--acc); }
+    .status-opened { background:#EAF3DE; color:#3B6D11; }
+    .reveal-card { background:var(--gllt); border:1px solid rgba(29,111,164,0.3); border-radius:var(--radius); padding:1.25rem; margin-bottom:12px; display:none; }
+    .reveal-card.visible { display:block; }
+    .reveal-letter-body { font-size:14px; color:var(--text); line-height:1.8; white-space:pre-wrap; font-style:italic; }
+    .reveal-sig { font-size:13px; color:var(--text2); margin-top:16px; font-style:italic; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── Onboarding ──────────────────────────────────────────── -->
+  <div id="onboarding" class="hidden">
+    <div class="ob-logo">
+      <svg width="22" height="28" viewBox="0 0 44 52" fill="none">
+        <path d="M22 4C22 4 8 18 8 30C8 38.28 14.27 45 22 45C29.73 45 36 38.28 36 30C36 18 22 4 22 4Z" fill="#1A7A6E"/>
+        <path d="M22 20C22 20 14 28 14 34C14 38.42 17.58 42 22 42C26.42 42 30 38.42 30 34C30 28 22 20 22 20Z" fill="#25A99A" fill-opacity="0.85"/>
+        <path d="M22 30C22 30 18 34 18 37C18 39.21 19.79 41 22 41C24.21 41 26 39.21 26 37C26 34 22 30 22 30Z" fill="white" fill-opacity="0.6"/>
+      </svg>
+      <span style="font-size:20px;font-weight:700;letter-spacing:-0.03em;color:var(--text)">true</span>
+    </div>
+
+    <!-- Step 1: Welcome -->
+    <div class="ob-step active" id="ob-1">
+      <div class="ob-title">Your story.<br>Your space.</div>
+      <div class="ob-sub">A private place to check in with yourself, write, and see how far you've come.</div>
+      <div class="ob-privacy">
+        <strong>This is private.</strong> No one else can see what you write here — not your carer, not your social worker, not anyone. It's yours.
+      </div>
+      <button class="btn-primary" style="width:100%" onclick="obNext(2)">Get started</button>
+    </div>
+
+    <!-- Step 2: Name -->
+    <div class="ob-step" id="ob-2">
+      <div class="ob-title">What should we call you?</div>
+      <div class="ob-sub">Doesn't have to be your real name if you don't want.</div>
+      <input type="text" id="ob-name" placeholder="Your name or nickname" style="margin-bottom:16px;font-size:16px">
+      <button class="btn-primary" style="width:100%" onclick="obSaveName()">That's me</button>
+    </div>
+
+    <!-- Step 3: Age -->
+    <div class="ob-step" id="ob-3">
+      <div class="ob-title">How old are you?</div>
+      <div class="ob-sub">We use this to make sure things feel right for you.</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px" id="age-opts">
+        <div class="mood-row" onclick="selAge('10-13','10-13')" data-a="10-13"><div class="mood-label">10 – 13</div></div>
+        <div class="mood-row" onclick="selAge('14-16','14-16')" data-a="14-16"><div class="mood-label">14 – 16</div></div>
+        <div class="mood-row" onclick="selAge('17-18','17-18')" data-a="17-18"><div class="mood-label">17 – 18</div></div>
+        <div class="mood-row" onclick="selAge('19-21','19-21')" data-a="19-21"><div class="mood-label">19 – 21</div></div>
+      </div>
+      <button class="btn-primary" style="width:100%" onclick="obNext(4)">Continue</button>
+    </div>
+
+    <!-- Step 4: PIN setup -->
+    <div class="ob-step" id="ob-4">
+      <div class="ob-title">Create your lock code.</div>
+      <div class="ob-sub">4 digits. Only you will know it. If you forget it, you'll need to reset the app.</div>
+      <div class="pin-dots" id="ob-dots" style="justify-content:center;margin-bottom:24px">
+        <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+      </div>
+      <div class="pin-grid" style="margin:0 auto 14px">
+        <button class="pin-key" onclick="obPin(1)">1</button><button class="pin-key" onclick="obPin(2)">2</button><button class="pin-key" onclick="obPin(3)">3</button>
+        <button class="pin-key" onclick="obPin(4)">4</button><button class="pin-key" onclick="obPin(5)">5</button><button class="pin-key" onclick="obPin(6)">6</button>
+        <button class="pin-key" onclick="obPin(7)">7</button><button class="pin-key" onclick="obPin(8)">8</button><button class="pin-key" onclick="obPin(9)">9</button>
+        <div class="pin-key empty"></div><button class="pin-key" onclick="obPin(0)">0</button><button class="pin-key del" onclick="obPinDel()">⌫</button>
+      </div>
+      <div class="pin-hint" id="ob-pin-hint">Choose 4 digits you'll remember</div>
+    </div>
+  </div>
+
+  <!-- ── Lock Screen ──────────────────────────────────────────── -->
+  <div id="lock-screen">
+    <div class="lock-brand">
+      <svg width="36" height="44" viewBox="0 0 44 52" fill="none">
+        <path d="M22 4C22 4 8 18 8 30C8 38.28 14.27 45 22 45C29.73 45 36 38.28 36 30C36 18 22 4 22 4Z" fill="#1A7A6E"/>
+        <path d="M22 20C22 20 14 28 14 34C14 38.42 17.58 42 22 42C26.42 42 30 38.42 30 34C30 28 22 20 22 20Z" fill="#25A99A" fill-opacity="0.85"/>
+        <path d="M22 30C22 30 18 34 18 37C18 39.21 19.79 41 22 41C24.21 41 26 39.21 26 37C26 34 22 30 22 30Z" fill="white" fill-opacity="0.6"/>
+      </svg>
+      <div class="lock-wordmark">true</div>
+      <div class="lock-tagline">Your words. Your truth.</div>
+    </div>
+    <div class="pin-dots" id="lock-dots">
+      <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+    </div>
+    <div class="pin-grid">
+      <button class="pin-key" onclick="lockTap(1)">1</button><button class="pin-key" onclick="lockTap(2)">2</button><button class="pin-key" onclick="lockTap(3)">3</button>
+      <button class="pin-key" onclick="lockTap(4)">4</button><button class="pin-key" onclick="lockTap(5)">5</button><button class="pin-key" onclick="lockTap(6)">6</button>
+      <button class="pin-key" onclick="lockTap(7)">7</button><button class="pin-key" onclick="lockTap(8)">8</button><button class="pin-key" onclick="lockTap(9)">9</button>
+      <div class="pin-key empty"></div><button class="pin-key" onclick="lockTap(0)">0</button><button class="pin-key del" onclick="lockDel()">⌫</button>
+    </div>
+    <div class="pin-hint" id="lock-hint">Enter your code</div>
+  </div>
+
+  <!-- ── Header ───────────────────────────────────────────────── -->
+  <div id="header">
+    <div class="true-logo">
+      <svg width="18" height="22" viewBox="0 0 44 52" fill="none">
+        <path d="M22 4C22 4 8 18 8 30C8 38.28 14.27 45 22 45C29.73 45 36 38.28 36 30C36 18 22 4 22 4Z" fill="#1A7A6E"/>
+        <path d="M22 20C22 20 14 28 14 34C14 38.42 17.58 42 22 42C26.42 42 30 38.42 30 34C30 28 22 20 22 20Z" fill="#25A99A" fill-opacity="0.85"/>
+        <path d="M22 30C22 30 18 34 18 37C18 39.21 19.79 41 22 41C24.21 41 26 39.21 26 37C26 34 22 30 22 30Z" fill="white" fill-opacity="0.6"/>
+      </svg>
+      <span class="true-wordmark">true</span>
+    </div>
+    <div class="avatar" id="header-avatar" onclick="showView('me')" style="cursor:pointer" title="About Me">?</div>
+    <button class="lock-btn" onclick="doLock()">Lock</button>
+  </div>
+
+  <!-- ── Views ────────────────────────────────────────────────── -->
+
+  <!-- HOME -->
+  <div class="view active" id="view-home">
+    <div class="page-title" id="home-greeting">Hey there.</div>
+    <div class="page-sub">This is yours. Honest and private.</div>
+
+    <div class="card-soft" id="home-checkin-card">
+      <div class="section-label" style="margin-top:0;color:var(--trdark)">TODAY</div>
+      <div style="font-size:14px;color:var(--tr);margin-bottom:12px" id="home-ci-text">You haven't checked in yet.</div>
+      <button class="btn-primary btn-sm" onclick="showView('mood')">How am I feeling?</button>
+    </div>
+
+    <div class="section-label">THIS WEEK</div>
+    <div class="card-soft mood-bar-chart" id="home-moodbar"></div>
+
+    <div class="section-label">SOMETHING TO THINK ABOUT</div>
+    <div class="card-soft" style="cursor:pointer" onclick="showView('journal')">
+      <div class="prompt-text" id="home-prompt-text"></div>
+      <span style="font-size:13px;color:var(--tr)">Write something →</span>
+    </div>
+
+    <div class="section-label">LAST MILESTONE</div>
+    <div id="home-milestone"></div>
+  </div>
+
+  <!-- MOOD -->
+  <div class="view" id="view-mood">
+    <div class="page-title">How are you actually feeling?</div>
+    <div class="page-sub">Be honest with yourself. Nobody else sees this.</div>
+
+    <div class="mood-row" onclick="selectMood(1,'Really low')" data-mv="1">
+      <div class="mood-dot" style="background:#C94F35"></div>
+      <div><div class="mood-label">Really low</div><div class="mood-desc">Everything feels heavy</div></div>
+    </div>
+    <div class="mood-row" onclick="selectMood(2,'Not great')" data-mv="2">
+      <div class="mood-dot" style="background:#D98E2B"></div>
+      <div><div class="mood-label">Not great</div><div class="mood-desc">A bit down or stressed</div></div>
+    </div>
+    <div class="mood-row" onclick="selectMood(3,'Okay')" data-mv="3">
+      <div class="mood-dot" style="background:#888780"></div>
+      <div><div class="mood-label">Okay</div><div class="mood-desc">Getting through</div></div>
+    </div>
+    <div class="mood-row" onclick="selectMood(4,'Pretty good')" data-mv="4">
+      <div class="mood-dot" style="background:#1D9E75"></div>
+      <div><div class="mood-label">Pretty good</div><div class="mood-desc">Things are alright</div></div>
+    </div>
+    <div class="mood-row" onclick="selectMood(5,'Really good')" data-mv="5">
+      <div class="mood-dot" style="background:#3B6D11"></div>
+      <div><div class="mood-label">Really good</div><div class="mood-desc">Feeling it today</div></div>
+    </div>
+
+    <div id="mood-extra" style="display:none;margin-top:16px">
+      <div class="section-label" style="margin-top:0">ANYTHING BEHIND THAT? (optional — stays private)</div>
+      <textarea id="mood-note" placeholder="A few words is enough."></textarea>
+      <div class="btn-row">
+        <button class="btn-secondary" onclick="showView('home')">Skip</button>
+        <button class="btn-primary" onclick="saveMood()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JOURNAL -->
+  <div class="view" id="view-journal">
+    <div class="page-title">Journal</div>
+    <div class="page-sub">Private. Honest. Yours.</div>
+
+    <div class="section-label" style="margin-top:0">TODAY'S PROMPT</div>
+    <div class="card-soft">
+      <div class="prompt-text" id="journal-prompt-text"></div>
+      <textarea id="journal-text" placeholder="Write whatever comes. It stays here."></textarea>
+      <div class="btn-row">
+        <button class="btn-secondary" onclick="nextPrompt()">Different prompt</button>
+        <button class="btn-primary" onclick="saveJournal()">Save</button>
+      </div>
+    </div>
+
+    <div class="section-label">PAST ENTRIES</div>
+    <div id="journal-list"></div>
+  </div>
+
+  <!-- ABOUT ME -->
+  <div class="view" id="view-me">
+    <div class="page-title">About Me</div>
+    <div class="page-sub">Who you are. What you're working towards.</div>
+
+    <div class="section-label" style="margin-top:0">WHAT MATTERS TO ME</div>
+    <div class="vals-wrap" id="vals-wrap" style="margin-bottom:4px"></div>
+
+    <div class="section-label">MY GOALS</div>
+    <div id="goals-list"></div>
+    <div style="display:flex;gap:8px;margin-bottom:4px">
+      <input type="text" id="goal-input" placeholder="Add a goal..." style="flex:1">
+      <button class="btn-primary" onclick="addGoal()">Add</button>
+    </div>
+
+    <div class="section-label">ONE THING I KNOW ABOUT MYSELF</div>
+    <textarea id="self-note-text" placeholder="Write something true about you..."></textarea>
+    <div style="margin-top:10px;display:flex;align-items:center;gap:12px">
+      <button class="btn-primary" onclick="saveSelfNote()">Save</button>
+      <span id="self-saved-msg" style="font-size:13px;color:var(--tr);display:none">Saved.</span>
+    </div>
+
+    <div class="section-label">MY DATA</div>
+    <div class="card-soft">
+      <div style="font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:12px">
+        Everything in True is yours. Download a copy any time — your moods, journal, milestones and letters, all in one file. Nothing is ever sent anywhere.
+      </div>
+      <button class="btn-primary" onclick="exportData()">Download my everything</button>
+    </div>
+  </div>
+
+  <!-- MILESTONES -->
+  <div class="view" id="view-milestones">
+    <div class="page-title">Milestones</div>
+    <div class="page-sub">The moments that matter — big and small.</div>
+
+    <div class="card-soft" style="margin-bottom:16px">
+      <div class="section-label" style="margin-top:0">ADD A MILESTONE</div>
+      <input type="text" id="ms-input" placeholder="What happened?" style="margin-bottom:10px">
+      <div class="section-label">WHAT KIND?</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px" id="ms-cats">
+        <button class="pill" data-c="School" onclick="selMsCat('School')">School</button>
+        <button class="pill" data-c="Personal" onclick="selMsCat('Personal')">Personal</button>
+        <button class="pill" data-c="Achievement" onclick="selMsCat('Achievement')">Achievement</button>
+        <button class="pill" data-c="New experience" onclick="selMsCat('New experience')">New experience</button>
+        <button class="pill" data-c="Relationship" onclick="selMsCat('Relationship')">Relationship</button>
+      </div>
+      <button class="btn-primary" style="width:100%" onclick="saveMilestone()">Add milestone</button>
+    </div>
+
+    <div class="section-label">YOUR MILESTONES</div>
+    <div id="milestones-list"></div>
+  </div>
+
+  <!-- LETTER TO FUTURE ME -->
+  <div class="view" id="view-letter">
+    <div class="page-title">Letter to Future Me</div>
+    <div class="page-sub">Write to yourself — and pick when you'll open it. It locks until then.</div>
+
+    <div class="tab-row">
+      <button class="tab active" id="tab-write" onclick="letterTab('write')">Write a letter</button>
+      <button class="tab" id="tab-letters" onclick="letterTab('letters')">My letters</button>
+    </div>
+
+    <div id="panel-write">
+      <div class="card-soft" style="margin-bottom:14px">
+        <div class="section-label" style="margin-top:0">WHAT TO WRITE ABOUT</div>
+        <div style="display:flex;flex-direction:column;gap:6px" id="letter-nudges"></div>
+      </div>
+
+      <div class="section-label" style="margin-top:0">OPEN IT WHEN I'M...</div>
+      <div class="age-pills" id="letter-age-pills"></div>
+      <div style="font-size:12px;color:var(--text3);margin:6px 0 16px" id="letter-unlock-preview">Choose an age above to set when this unlocks.</div>
+
+      <div class="letter-compose">
+        <div class="letter-opening" id="letter-opening">Dear future me,</div>
+        <textarea id="letter-body" placeholder="Write whatever you want your future self to know. How you're feeling right now. What you're hoping for. What you've been through.
+
+No one else will read this. It locks until the date you choose."></textarea>
+      </div>
+
+      <button class="btn-primary" style="width:100%;background:var(--acc)" onclick="saveLetter()">Seal this letter</button>
+      <div style="font-size:12px;color:var(--text3);text-align:center;margin-top:8px">Once sealed, it locks until your chosen age. You won't be able to edit it.</div>
+    </div>
+
+    <div id="panel-letters" style="display:none">
+      <div id="letter-reveal" class="reveal-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <div style="font-size:13px;font-weight:600;color:var(--acc)" id="reveal-title"></div>
+          <button onclick="closeReveal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3);line-height:1;padding:0 2px">&times;</button>
+        </div>
+        <div class="reveal-letter-body" id="reveal-body"></div>
+        <div class="reveal-sig" id="reveal-sig"></div>
+      </div>
+      <div id="letters-list"></div>
+    </div>
+  </div>
+
+  <!-- JOURNEY -->
+  <div class="view" id="view-journey">
+    <div class="page-title">My Journey</div>
+    <div class="page-sub">Everything you've recorded, in one place.</div>
+
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+      <button class="btn-secondary btn-sm" onclick="showView('milestones')" style="display:inline-flex;align-items:center;gap:6px">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2v8M2 6h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Add milestone
+      </button>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px" id="journey-filters">
+      <button class="pill active" data-f="all" onclick="setJourneyFilter('all')">All</button>
+      <button class="pill" data-f="mood" onclick="setJourneyFilter('mood')">Moods</button>
+      <button class="pill" data-f="journal" onclick="setJourneyFilter('journal')">Journal</button>
+      <button class="pill" data-f="milestone" onclick="setJourneyFilter('milestone')">Milestones</button>
+      <button class="pill" data-f="letter" onclick="setJourneyFilter('letter')">Letters</button>
+    </div>
+    <div id="journey-list"></div>
+  </div>
+
+  <!-- ── Nav ──────────────────────────────────────────────────── -->
+  <nav id="nav">
+    <button class="nav-btn active" id="nb-home" onclick="showView('home')">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <path d="M10 3L17 9v9H13v-5H7v5H3V9L10 3z" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/>
+      </svg>
+      Home
+    </button>
+    <button class="nav-btn" id="nb-mood" onclick="showView('mood')">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M7 12s1 2 3 2 3-2 3-2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        <circle cx="7.5" cy="9" r="1" fill="currentColor"/>
+        <circle cx="12.5" cy="9" r="1" fill="currentColor"/>
+      </svg>
+      Mood
+    </button>
+    <button class="nav-btn" id="nb-journal" onclick="showView('journal')">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <rect x="4" y="3" width="12" height="14" rx="2" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M7 8h6M7 11h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      Journal
+    </button>
+    <button class="nav-btn" id="nb-letter" onclick="showView('letter')">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <path d="M3 5h14M3 8l7 5 7-5M3 5v11a1 1 0 001 1h12a1 1 0 001-1V5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Letter
+    </button>
+    <button class="nav-btn" id="nb-journey" onclick="showView('journey')">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <circle cx="5" cy="16" r="2" fill="currentColor"/>
+        <circle cx="10" cy="10" r="2" fill="currentColor"/>
+        <circle cx="15" cy="5" r="2" fill="currentColor"/>
+        <path d="M5 16L10 10L15 5" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 2"/>
+      </svg>
+      Journey
+    </button>
+  </nav>
+
+</div><!-- /app -->
+
+<script>
+// ─── Constants ────────────────────────────────────────────────
+const MOOD_COLORS = {1:'#C94F35', 2:'#D98E2B', 3:'#888780', 4:'#1D9E75', 5:'#3B6D11'};
+
+const CAT_STYLES = {
+  'School':         {bg:'#E6F1FB', color:'#185FA5'},
+  'Personal':       {bg:'#E6F5F4', color:'#0F5349'},
+  'Achievement':    {bg:'#EAF3DE', color:'#3B6D11'},
+  'New experience': {bg:'#E6F2FA', color:'#854F0B'},
+  'Relationship':   {bg:'#FBEAF0', color:'#993556'},
+};
+
+// Age-adaptive prompts — band chosen from S.age at render time
+const PROMPTS_BY_BAND = {
+  younger: [ // 10–13: simple, concrete, gentle
+    "What made you smile today?",
+    "What's something you're really good at?",
+    "If today had a colour, what would it be — and why?",
+    "What's your favourite thing about yourself?",
+    "What's one thing that felt hard today?",
+    "Who makes you feel safe?",
+    "What would you do on a perfect day?",
+    "What's something new you'd like to try?",
+    "What's one thing you did well this week?",
+    "What makes you feel calm?",
+    "If you could tell everyone one thing about you, what would it be?",
+    "What are you looking forward to?",
+    "What's something kind you did — or someone did for you?",
+    "What's your favourite place to be?",
+    "If you had one wish, what would it be?",
+  ],
+  mid: [ // 14–16
+    "What's one thing you're proud of today?",
+    "What do you actually enjoy — not what you think you should?",
+    "How are you really feeling right now?",
+    "What's something nobody knows about you?",
+    "What's one challenge you're dealing with?",
+    "What would make tomorrow a better day?",
+    "Who are you grateful for right now?",
+    "What have you learned about yourself this week?",
+    "What do you want to be different in six months?",
+    "What have you survived that you don't give yourself enough credit for?",
+    "What does a good day actually feel like for you?",
+    "What do you wish people understood about you?",
+    "If you could change one thing about your life right now, what would it be?",
+    "What are you afraid of, and is that fear holding you back?",
+    "What would you do if you knew you couldn't fail?",
+  ],
+  older: [ // 17+: deeper, future-facing
+    "What's one thing you're proud of today?",
+    "Who are you when nobody's watching — and do you like that person?",
+    "What part of your story do you get to write next?",
+    "What's a belief about yourself you're ready to let go of?",
+    "What does independence actually mean to you?",
+    "What have you survived that you don't give yourself enough credit for?",
+    "What kind of person do you want to be in five years?",
+    "Which relationships in your life actually build you up?",
+    "What do you wish people understood about you?",
+    "What's a decision you made that you'd defend to anyone?",
+    "Where do you feel most like yourself?",
+    "What scares you about the future — and what excites you?",
+    "What would you tell your younger self about the past year?",
+    "What do you need more of in your life? And less of?",
+    "What would you do if you knew you couldn't fail?",
+  ],
+};
+
+function activePrompts() {
+  if (S.age === '10-13') return PROMPTS_BY_BAND.younger;
+  if (S.age === '17-18' || S.age === '19-21') return PROMPTS_BY_BAND.older;
+  return PROMPTS_BY_BAND.mid;
+}
+
+function currentPrompt() {
+  const list = activePrompts();
+  return list[S.promptIndex % list.length];
+}
+
+const VALUES = [
+  'Honesty','Loyalty','Independence','Kindness','Creativity',
+  'Courage','Family','Ambition','Freedom','Fairness','Fun','Resilience',
+  'Trust','Adventure','Humour','Patience',
+];
+
+// ─── State ────────────────────────────────────────────────────
+// Loaded from / saved to localStorage
+let S = {
+  name: '',
+  age: '',
+  pin: '',        // legacy plaintext — migrated to pinHash on boot, then cleared
+  pinHash: '',
+  pinSalt: '',
+  pinFails: 0,
+  pinLockUntil: 0,
+  promptIndex: 0,
+  selectedMoodVal: null,
+  selectedMoodLabel: null,
+  selectedMsCat: null,
+  journeyFilter: 'all',
+  checkedInToday: false,
+  moods: [],
+  journals: [],
+  milestones: [],
+  letters: [],
+  selectedValues: [],
+  goals: [],
+  selfNote: '',
+};
+
+// Demo data — loads ONLY with ?demo=1 in the URL. Real users start clean.
+const DEMO_DATA = {
+  name: 'Jordan', age: '14-16', pin: '1234',
+  moods: [
+    {d:'Mon', v:4, l:'Pretty good', n:'', ts: Date.now() - 5*86400000},
+    {d:'Tue', v:3, l:'Okay',        n:'Bit tired', ts: Date.now() - 4*86400000},
+    {d:'Wed', v:2, l:'Not great',   n:'Argument at college', ts: Date.now() - 3*86400000},
+    {d:'Thu', v:4, l:'Pretty good', n:'', ts: Date.now() - 2*86400000},
+    {d:'Fri', v:5, l:'Really good', n:'Ended up having a great day', ts: Date.now() - 86400000},
+  ],
+  journals: [
+    {d:'11 Mar', p:"What's something nobody knows about you?", t:"I actually really enjoy cooking. Never told anyone that.", ts: Date.now() - 4*86400000},
+    {d:'13 Mar', p:"What's one thing you're proud of today?",  t:"Sorted my college application myself. Didn't expect to manage it but I did.", ts: Date.now() - 2*86400000},
+  ],
+  milestones: [
+    {d:'28 Feb', c:'Personal',    t:'Opened up to someone I trust',         ts: Date.now() - 15*86400000},
+    {d:'5 Mar',  c:'Achievement', t:'Went a full week without missing college', ts: Date.now() - 10*86400000},
+    {d:'10 Mar', c:'School',      t:'Submitted my personal statement',       ts: Date.now() - 5*86400000},
+  ],
+  letters: [
+    {id:'demo1', writtenAt:'10 Mar 2026', writtenAge:15, openAt:18, openYear:2029,
+     body:"By the time you read this you'll be 18. I hope you've got somewhere that feels like yours. I hope you're still drawing.", status:'locked', ts: Date.now() - 5*86400000}
+  ],
+  selectedValues: ['Loyalty','Resilience','Freedom'],
+  goals: ['Pass my Level 3','Learn to drive','Move into my own place'],
+  selfNote: "I'm stronger than I think I am.",
+};
+
+// ─── localStorage persistence ─────────────────────────────────
+function saveState() {
+  try { localStorage.setItem('true_state', JSON.stringify(S)); } catch(e) {}
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem('true_state');
+    if (raw) {
+      const saved = JSON.parse(raw);
+      S = Object.assign(S, saved);
+    }
+  } catch(e) {}
+}
+
+// ─── PIN security ─────────────────────────────────────────────
+// The PIN is never stored. A salted SHA-256 hash is kept instead.
+const PIN_MAX_FAILS = 5;
+const PIN_LOCK_MS = 30000;
+
+function randomSalt() {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function hashPin(pin, salt) {
+  // crypto.subtle needs a secure context (HTTPS / localhost); marked fallback keeps file:// usable
+  if (!(crypto.subtle && crypto.subtle.digest)) return 'plain:' + salt + ':' + pin;
+  const data = new TextEncoder().encode(salt + ':' + pin);
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf), b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function setPin(pin) {
+  S.pinSalt = randomSalt();
+  S.pinHash = await hashPin(pin, S.pinSalt);
+  S.pin = '';
+  saveState();
+}
+
+async function verifyPin(pin) {
+  if (!S.pinHash) return true;
+  return (await hashPin(pin, S.pinSalt)) === S.pinHash;
+}
+
+// ─── Onboarding ───────────────────────────────────────────────
+let obPinEntry = [];
+let obPinConfirm = [];
+let obPinStep = 1;
+
+function showOnboarding() {
+  document.getElementById('onboarding').classList.remove('hidden');
+  document.getElementById('lock-screen').classList.add('hidden');
+}
+
+function obNext(step) {
+  document.querySelectorAll('.ob-step').forEach(s => s.classList.remove('active'));
+  document.getElementById('ob-' + step).classList.add('active');
+}
+
+function obSaveName() {
+  const val = document.getElementById('ob-name').value.trim();
+  if (!val) return;
+  S.name = val;
+  document.getElementById('header-avatar').textContent = val[0].toUpperCase();
+  obNext(3);
+}
+
+function selAge(label, val) {
+  document.querySelectorAll('#age-opts .mood-row').forEach(r => r.classList.remove('selected'));
+  document.querySelector(`[data-a="${val}"]`).classList.add('selected');
+  S.age = label;
+}
+
+function obPin(n) {
+  if (obPinStep === 1) {
+    if (obPinEntry.length >= 4) return;
+    obPinEntry.push(n);
+    updateObDots();
+    if (obPinEntry.length === 4) {
+      setTimeout(() => {
+        obPinStep = 2;
+        obPinEntry = [];
+        updateObDots();
+        document.getElementById('ob-pin-hint').textContent = 'Enter it again to confirm';
+      }, 300);
+    }
+  } else {
+    if (obPinConfirm.length >= 4) return;
+    obPinConfirm.push(n);
+    updateObDots();
+    if (obPinConfirm.length === 4) {
+      setTimeout(async () => {
+        if (obPinEntry.join('') === obPinConfirm.join('')) {
+          await setPin(obPinConfirm.join(''));
+          finishOnboarding();
+        } else {
+          obPinEntry = []; obPinConfirm = []; obPinStep = 1;
+          updateObDots();
+          document.getElementById('ob-pin-hint').textContent = "Codes didn't match — try again";
+        }
+      }, 300);
+    }
+  }
+}
+
+function obPinDel() {
+  if (obPinStep === 1) { obPinEntry.pop(); }
+  else { obPinConfirm.pop(); }
+  updateObDots();
+}
+
+function updateObDots() {
+  const entry = obPinStep === 1 ? obPinEntry : obPinConfirm;
+  document.querySelectorAll('#ob-dots .pin-dot').forEach((d,i) => d.classList.toggle('filled', i < entry.length));
+}
+
+function finishOnboarding() {
+  document.getElementById('onboarding').classList.add('hidden');
+  S.checkedInToday = false;
+  saveState();
+  initApp();
+}
+
+// ─── Lock Screen ──────────────────────────────────────────────
+let lockEntry = [];
+
+function lockTap(n) {
+  if (Date.now() < (S.pinLockUntil || 0)) {
+    const secs = Math.ceil((S.pinLockUntil - Date.now()) / 1000);
+    document.getElementById('lock-hint').textContent = `Too many tries — wait ${secs} second${secs !== 1 ? 's' : ''}`;
+    return;
+  }
+  if (lockEntry.length >= 4) return;
+  lockEntry.push(n);
+  updateLockDots();
+  if (lockEntry.length === 4) {
+    setTimeout(async () => {
+      if (await verifyPin(lockEntry.join(''))) {
+        S.pinFails = 0;
+        S.pinLockUntil = 0;
+        saveState();
+        unlock();
+      } else {
+        S.pinFails = (S.pinFails || 0) + 1;
+        let hint = 'Incorrect code — try again';
+        if (S.pinFails >= PIN_MAX_FAILS) {
+          S.pinLockUntil = Date.now() + PIN_LOCK_MS;
+          S.pinFails = 0;
+          hint = 'Too many tries — wait 30 seconds';
+        }
+        saveState();
+        document.getElementById('lock-hint').textContent = hint;
+        lockEntry = [];
+        updateLockDots();
+      }
+    }, 300);
+  }
+}
+
+function lockDel() { lockEntry.pop(); updateLockDots(); }
+
+function updateLockDots() {
+  document.querySelectorAll('#lock-dots .pin-dot').forEach((d,i) => d.classList.toggle('filled', i < lockEntry.length));
+}
+
+function unlock() {
+  document.getElementById('lock-screen').classList.add('hidden');
+  lockEntry = [];
+  updateLockDots();
+  document.getElementById('lock-hint').textContent = 'Enter your code';
+  renderHome();
+}
+
+function doLock() {
+  document.getElementById('lock-screen').classList.remove('hidden');
+  lockEntry = [];
+  updateLockDots();
+}
+
+// ─── Navigation ───────────────────────────────────────────────
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  document.getElementById('nb-' + name)?.classList.add('active');
+
+  if (name === 'home')       renderHome();
+  if (name === 'journal')    renderJournal();
+  if (name === 'me')         renderMe();
+  if (name === 'milestones') renderMilestones();
+  if (name === 'letter')     renderLetterView();
+  if (name === 'journey')    renderJourney();
+}
+
+// ─── Home ─────────────────────────────────────────────────────
+function renderHome() {
+  const greeting = S.name ? `Hey ${S.name}.` : 'Hey there.';
+  document.getElementById('home-greeting').textContent = greeting;
+  document.getElementById('home-prompt-text').textContent = currentPrompt();
+
+  // Mood bar
+  const bar = document.getElementById('home-moodbar');
+  const recent = S.moods.slice(-7);
+  if (!recent.length) {
+    bar.innerHTML = '<div style="font-size:13px;color:var(--text3);align-self:center;width:100%;text-align:center">Your week builds here as you check in.</div>';
+  } else {
+    bar.innerHTML = recent.map(m => `
+      <div class="mbc-col">
+        <div class="mbc-bar" style="background:${MOOD_COLORS[m.v]};height:${Math.round((m.v/5)*46)}px"></div>
+        <div class="mbc-day">${m.d}</div>
+      </div>
+    `).join('');
+  }
+
+  // Last milestone
+  const ms = S.milestones[S.milestones.length - 1];
+  if (ms) {
+    const cs = CAT_STYLES[ms.c] || CAT_STYLES['Personal'];
+    document.getElementById('home-milestone').innerHTML = `
+      <div class="card-soft" style="cursor:pointer" onclick="showView('milestones')">
+        <span class="badge" style="background:${cs.bg};color:${cs.color}">${ms.c}</span>
+        <div style="font-size:14px;color:var(--text);margin-top:7px;line-height:1.4">${ms.t}</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:4px">${ms.d}</div>
+      </div>
+    `;
+  } else {
+    document.getElementById('home-milestone').innerHTML = `
+      <div class="card-soft" style="cursor:pointer" onclick="showView('milestones')">
+        <div style="font-size:14px;color:var(--text2);line-height:1.5">Nothing recorded yet. When something matters — big or small — put it here.</div>
+        <div style="font-size:13px;color:var(--tr);margin-top:8px">Add your first milestone &rarr;</div>
+      </div>
+    `;
+  }
+}
+
+// ─── Mood ─────────────────────────────────────────────────────
+function selectMood(v, l) {
+  S.selectedMoodVal = v;
+  S.selectedMoodLabel = l;
+  document.querySelectorAll('.mood-row[data-mv]').forEach(r => r.classList.toggle('selected', parseInt(r.dataset.mv) === v));
+  document.getElementById('mood-extra').style.display = 'block';
+}
+
+function saveMood() {
+  if (!S.selectedMoodVal) return;
+  const note = document.getElementById('mood-note').value.trim();
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const today = days[new Date().getDay()];
+  S.moods.push({d: today, v: S.selectedMoodVal, l: S.selectedMoodLabel, n: note, ts: Date.now()});
+  S.checkedInToday = true;
+  document.getElementById('home-ci-text').textContent = `Checked in — ${S.selectedMoodLabel}.`;
+  document.getElementById('mood-note').value = '';
+  S.selectedMoodVal = null;
+  S.selectedMoodLabel = null;
+  document.querySelectorAll('.mood-row[data-mv]').forEach(r => r.classList.remove('selected'));
+  document.getElementById('mood-extra').style.display = 'none';
+  saveState();
+  showView('home');
+}
+
+// ─── Journal ──────────────────────────────────────────────────
+function renderJournal() {
+  document.getElementById('journal-prompt-text').textContent = currentPrompt();
+  const list = document.getElementById('journal-list');
+  if (!S.journals.length) {
+    list.innerHTML = '<div style="font-size:14px;color:var(--text3);padding:12px 0">Nothing written yet. Start today.</div>';
+    return;
+  }
+  list.innerHTML = S.journals.slice().reverse().map(j => `
+    <div class="card" style="margin-bottom:10px">
+      <div style="font-size:12px;color:var(--text3);margin-bottom:3px">${j.d}</div>
+      <div style="font-size:12px;color:var(--text2);font-style:italic;margin-bottom:8px;line-height:1.5">${j.p}</div>
+      <div style="font-size:14px;color:var(--text);line-height:1.6">${j.t}</div>
+    </div>
+  `).join('');
+}
+
+function nextPrompt() {
+  S.promptIndex = (S.promptIndex + 1) % activePrompts().length;
+  document.getElementById('journal-prompt-text').textContent = currentPrompt();
+  document.getElementById('home-prompt-text').textContent = currentPrompt();
+}
+
+function saveJournal() {
+  const t = document.getElementById('journal-text').value.trim();
+  if (!t) return;
+  const now = new Date();
+  const d = now.toLocaleDateString('en-GB', {day:'numeric', month:'short'});
+  S.journals.push({d, p: currentPrompt(), t, ts: Date.now()});
+  document.getElementById('journal-text').value = '';
+  saveState();
+  renderJournal();
+}
+
+// ─── About Me ─────────────────────────────────────────────────
+function renderMe() {
+  const wrap = document.getElementById('vals-wrap');
+  wrap.innerHTML = VALUES.map(v => `
+    <button class="pill ${S.selectedValues.includes(v) ? 'active' : ''}" onclick="toggleValue('${v}')">${v}</button>
+  `).join('');
+  renderGoals();
+  document.getElementById('self-note-text').value = S.selfNote || '';
+}
+
+function toggleValue(v) {
+  const idx = S.selectedValues.indexOf(v);
+  if (idx > -1) S.selectedValues.splice(idx, 1);
+  else S.selectedValues.push(v);
+  saveState();
+  renderMe();
+}
+
+function renderGoals() {
+  const el = document.getElementById('goals-list');
+  el.innerHTML = S.goals.map((g, i) => `
+    <div class="goal-item">
+      <div class="goal-circle"></div>
+      <span class="goal-text">${g}</span>
+      <button class="goal-del" onclick="deleteGoal(${i})" aria-label="Remove goal">×</button>
+    </div>
+  `).join('');
+}
+
+function addGoal() {
+  const v = document.getElementById('goal-input').value.trim();
+  if (!v) return;
+  S.goals.push(v);
+  document.getElementById('goal-input').value = '';
+  saveState();
+  renderGoals();
+}
+
+function deleteGoal(i) {
+  S.goals.splice(i, 1);
+  saveState();
+  renderGoals();
+}
+
+// "Download my everything" — the user's full story as JSON.
+// PIN material and transient UI state are excluded.
+function exportData() {
+  const { pin, pinHash, pinSalt, pinFails, pinLockUntil,
+          selectedMoodVal, selectedMoodLabel, selectedMsCat, journeyFilter, ...mine } = S;
+  const payload = {
+    app: 'True',
+    tagline: 'Your words. Your truth.',
+    exported: new Date().toISOString(),
+    ...mine,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'true-my-story-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function saveSelfNote() {
+  S.selfNote = document.getElementById('self-note-text').value;
+  saveState();
+  const msg = document.getElementById('self-saved-msg');
+  msg.style.display = 'inline';
+  setTimeout(() => msg.style.display = 'none', 2000);
+}
+
+// ─── Milestones ───────────────────────────────────────────────
+function renderMilestones() {
+  const list = document.getElementById('milestones-list');
+  if (!S.milestones.length) {
+    list.innerHTML = '<div style="font-size:14px;color:var(--text3);padding:12px 0">No milestones yet. Add your first one.</div>';
+    return;
+  }
+  list.innerHTML = S.milestones.slice().reverse().map(m => {
+    const cs = CAT_STYLES[m.c] || CAT_STYLES['Personal'];
+    return `
+      <div class="card" style="margin-bottom:10px;display:flex;gap:12px;align-items:flex-start">
+        <div style="width:9px;height:9px;border-radius:50%;background:${cs.color};flex-shrink:0;margin-top:5px"></div>
+        <div>
+          <span class="badge" style="background:${cs.bg};color:${cs.color}">${m.c}</span>
+          <div style="font-size:14px;color:var(--text);margin-top:6px;line-height:1.4">${m.t}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:4px">${m.d}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function selMsCat(cat) {
+  S.selectedMsCat = cat;
+  document.querySelectorAll('#ms-cats .pill').forEach(b => b.classList.toggle('active', b.dataset.c === cat));
+}
+
+function saveMilestone() {
+  const t = document.getElementById('ms-input').value.trim();
+  const c = S.selectedMsCat || 'Personal';
+  if (!t) return;
+  const now = new Date();
+  const d = now.toLocaleDateString('en-GB', {day:'numeric', month:'short'});
+  S.milestones.push({d, c, t, ts: Date.now()});
+  document.getElementById('ms-input').value = '';
+  S.selectedMsCat = null;
+  document.querySelectorAll('#ms-cats .pill').forEach(b => b.classList.remove('active'));
+  saveState();
+  renderMilestones();
+}
+
+// ─── Letter to Future Me ──────────────────────────────────────
+const LETTER_NUDGES = [
+  "What are you most worried about right now?",
+  "What do you hope is different by the time you read this?",
+  "What's one thing you want to remember about who you are today?",
+  "What are you proud of that nobody sees?",
+  "What do you want your future self to know you survived?",
+  "What do you hope you've become by the time you open this?",
+];
+const LETTER_AGES = [18, 21, 25];
+let letterSelectedAge = null;
+let letterNudgeSet = [];
+
+function currentAge() {
+  const map = {'10-13': 12, '14-16': 15, '17-18': 17, '19-21': 20};
+  return map[S.age] || 16;
+}
+
+function renderLetterView() {
+  letterNudgeSet = [...LETTER_NUDGES].sort(() => Math.random() - 0.5).slice(0, 3);
+  document.getElementById('letter-nudges').innerHTML = letterNudgeSet.map(p => `
+    <div style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;padding:4px 0" onclick="useLetterPrompt(this)" data-p="${p.replace(/"/g,'&quot;')}">
+      <div style="width:18px;height:18px;border-radius:50%;background:var(--gllt);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5h6M5 2l3 3-3 3" stroke="#1D6FA4" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span style="font-size:13px;color:var(--text2);line-height:1.5">${p}</span>
+    </div>`).join('');
+  renderLetterAgePills();
+  renderLettersList();
+}
+
+function useLetterPrompt(el) {
+  const p = el.dataset.p;
+  const ta = document.getElementById('letter-body');
+  ta.value = ta.value.trim() ? ta.value + '\n\n' + p + '\n' : p + '\n';
+  ta.focus();
+}
+
+function renderLetterAgePills() {
+  const valid = LETTER_AGES.filter(a => a > currentAge());
+  document.getElementById('letter-age-pills').innerHTML = valid.map(a =>
+    `<button class="age-pill ${letterSelectedAge === a ? 'active' : ''}" onclick="selectLetterAge(${a})">Age ${a}</button>`
+  ).join('');
+}
+
+function selectLetterAge(age) {
+  letterSelectedAge = age;
+  renderLetterAgePills();
+  const years = age - currentAge();
+  const year = new Date().getFullYear() + years;
+  document.getElementById('letter-unlock-preview').textContent =
+    `Unlocks in ${years} year${years !== 1 ? 's' : ''} — ${year}`;
+  document.getElementById('letter-opening').textContent = `Dear me at ${age},`;
+}
+
+function letterTab(tab) {
+  document.getElementById('panel-write').style.display   = tab === 'write' ? 'block' : 'none';
+  document.getElementById('panel-letters').style.display = tab === 'letters' ? 'block' : 'none';
+  document.getElementById('tab-write').classList.toggle('active', tab === 'write');
+  document.getElementById('tab-letters').classList.toggle('active', tab === 'letters');
+  document.getElementById('letter-reveal').classList.remove('visible');
+  if (tab === 'letters') renderLettersList();
+}
+
+function saveLetter() {
+  const body = document.getElementById('letter-body').value.trim();
+  if (!letterSelectedAge) { alert('Choose an age to open this at first.'); return; }
+  if (!body) { alert('Write something first — even a few lines.'); return; }
+  const years = letterSelectedAge - currentAge();
+  const now = new Date();
+  S.letters.push({
+    id: 'letter_' + Date.now(),
+    writtenAt: now.toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'}),
+    writtenAge: currentAge(),
+    openAt: letterSelectedAge,
+    openYear: now.getFullYear() + years,
+    body, status: 'locked', ts: Date.now()
+  });
+  document.getElementById('letter-body').value = '';
+  letterSelectedAge = null;
+  document.getElementById('letter-opening').textContent = 'Dear future me,';
+  document.getElementById('letter-unlock-preview').textContent = 'Choose an age above to set when this unlocks.';
+  saveState();
+  letterTab('letters');
+}
+
+function renderLettersList() {
+  const list = document.getElementById('letters-list');
+  if (!S.letters.length) {
+    list.innerHTML = '<div style="text-align:center;padding:2rem 1rem;color:var(--text3);font-size:14px;line-height:1.6">You haven\'t written any letters yet.<br>Your first one will wait here when you do.</div>';
+    return;
+  }
+  const nowYear = new Date().getFullYear();
+  S.letters.forEach(l => { if (l.openYear <= nowYear && l.status === 'locked') l.status = 'ready'; });
+
+  list.innerHTML = S.letters.slice().reverse().map(l => {
+    const ready = l.status === 'ready', opened = l.status === 'opened';
+    let badge, action = '';
+    if (opened) {
+      badge = '<span class="letter-status status-opened">Opened</span>';
+      action = `<button onclick="revealLetter('${l.id}')" style="margin-top:10px;background:none;border:none;font-size:13px;color:var(--text3);cursor:pointer;font-family:inherit;text-decoration:underline;padding:0">Read again</button>`;
+    } else if (ready) {
+      badge = '<span class="letter-status status-ready">Ready to open</span>';
+      action = `<button onclick="revealLetter('${l.id}')" style="margin-top:10px;background:var(--acc);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;width:100%">Open this letter</button>`;
+    } else {
+      badge = `<span class="letter-status status-locked">Locked — opens ${l.openYear}</span>`;
+    }
+    return `<div class="locked-letter">
+      <div class="lock-icon-wrap ${ready || opened ? 'unlocked' : ''}">
+        ${ready || opened
+          ? '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 10h12M4 7h14M4 13h8" stroke="#1D6FA4" stroke-width="1.4" stroke-linecap="round"/></svg>'
+          : '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="5" y="9" width="10" height="8" rx="2" stroke="#888780" stroke-width="1.4"/><path d="M7 9V7a3 3 0 016 0v2" stroke="#888780" stroke-width="1.4" stroke-linecap="round"/></svg>'}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;color:var(--text3);margin-bottom:3px">To me at age ${l.openAt}</div>
+        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.body.substring(0, 50)}${l.body.length > 50 ? '…' : ''}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">${badge}<span style="font-size:11px;color:var(--text3)">Written ${l.writtenAt}</span></div>
+        ${action}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function revealLetter(id) {
+  const l = S.letters.find(x => x.id === id);
+  if (!l) return;
+  l.status = 'opened';
+  saveState();
+  document.getElementById('reveal-title').textContent = `To me at age ${l.openAt} — written ${l.writtenAt}`;
+  document.getElementById('reveal-body').textContent = `Dear me at ${l.openAt},\n\n${l.body}`;
+  document.getElementById('reveal-sig').textContent = `— You, at age ${l.writtenAge}`;
+  document.getElementById('letter-reveal').classList.add('visible');
+  document.getElementById('letter-reveal').scrollIntoView({behavior:'smooth', block:'start'});
+  renderLettersList();
+}
+
+function closeReveal() {
+  document.getElementById('letter-reveal').classList.remove('visible');
+}
+
+// ─── Journey ──────────────────────────────────────────────────
+function setJourneyFilter(f) {
+  S.journeyFilter = f;
+  document.querySelectorAll('#journey-filters .pill').forEach(b => b.classList.toggle('active', b.dataset.f === f));
+  renderJourney();
+}
+
+function renderJourney() {
+  const all = [];
+  S.moods.forEach(m => all.push({type:'mood', d:m.d, data:m, ts:m.ts||0}));
+  S.journals.forEach(j => all.push({type:'journal', d:j.d, data:j, ts:j.ts||0}));
+  S.milestones.forEach(m => all.push({type:'milestone', d:m.d, data:m, ts:m.ts||0}));
+  (S.letters||[]).forEach(l => all.push({type:'letter', d:l.writtenAt, data:l, ts:l.ts||0}));
+
+  all.sort((a,b) => b.ts - a.ts);
+
+  const filtered = S.journeyFilter === 'all' ? all : all.filter(i => i.type === S.journeyFilter);
+  const list = document.getElementById('journey-list');
+
+  if (!filtered.length) {
+    list.innerHTML = '<div style="font-size:14px;color:var(--text3);padding:12px 0">Nothing here yet.</div>';
+    return;
+  }
+
+  list.innerHTML = filtered.map((item, i) => {
+    const dotColor = item.type === 'mood' ? MOOD_COLORS[item.data.v] : item.type === 'milestone' ? '#1A7A6E' : item.type === 'letter' ? '#1D6FA4' : '#888780';
+    const typeLabel = {mood:'Check-in', journal:'Journal', milestone:'Milestone', letter:'Future Letter'}[item.type];
+    let body = '';
+
+    if (item.type === 'mood') {
+      body = `
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:9px;height:9px;border-radius:50%;background:${MOOD_COLORS[item.data.v]}"></div>
+          <span style="font-size:14px;color:var(--text);font-weight:500">${item.data.l}</span>
+        </div>
+        ${item.data.n ? `<div style="font-size:13px;color:var(--text2);margin-top:4px;line-height:1.5">${item.data.n}</div>` : ''}
+      `;
+    } else if (item.type === 'journal') {
+      body = `
+        <div style="font-size:12px;color:var(--text2);font-style:italic;margin-bottom:4px;line-height:1.5">${item.data.p}</div>
+        <div style="font-size:14px;color:var(--text);line-height:1.5">${item.data.t.substring(0, 100)}${item.data.t.length > 100 ? '…' : ''}</div>
+      `;
+    } else if (item.type === 'letter') {
+      body = `
+        <div style="font-size:12px;color:var(--text2);margin-bottom:4px">To me at age ${item.data.openAt} · ${item.data.status === 'locked' ? 'locked until ' + item.data.openYear : item.data.status}</div>
+        <div style="font-size:14px;color:var(--text);line-height:1.5">${item.data.body.substring(0, 80)}${item.data.body.length > 80 ? '…' : ''}</div>
+      `;
+    } else {
+      const cs = CAT_STYLES[item.data.c] || CAT_STYLES['Personal'];
+      body = `
+        <span class="badge" style="background:${cs.bg};color:${cs.color}">${item.data.c}</span>
+        <div style="font-size:14px;color:var(--text);margin-top:6px;line-height:1.4">${item.data.t}</div>
+      `;
+    }
+
+    return `
+      <div class="tl-row">
+        <div class="tl-col">
+          <div class="tl-dot" style="background:${dotColor}"></div>
+          ${i < filtered.length - 1 ? '<div class="tl-line"></div>' : ''}
+        </div>
+        <div style="flex:1;padding-bottom:14px">
+          <div style="font-size:11px;color:var(--text3);margin-bottom:5px;font-weight:500">${item.d} &bull; ${typeLabel}</div>
+          ${body}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ─── Init ─────────────────────────────────────────────────────
+function initApp() {
+  if (S.name) {
+    document.getElementById('header-avatar').textContent = S.name[0].toUpperCase();
+    document.getElementById('home-greeting').textContent = `Hey ${S.name}.`;
+  }
+  renderHome();
+}
+
+async function boot() {
+  loadState();
+
+  // Demo mode — ?demo=1 loads a pre-populated example account
+  if (new URLSearchParams(location.search).get('demo') === '1' && !localStorage.getItem('true_state')) {
+    S = Object.assign(S, JSON.parse(JSON.stringify(DEMO_DATA)));
+  }
+
+  // Migrate legacy plaintext PIN to salted hash, then clear it
+  if (S.pin && !S.pinHash) {
+    await setPin(S.pin);
+  }
+
+  // First run — show onboarding
+  if (!S.name) {
+    showOnboarding();
+    return;
+  }
+
+  // Has PIN — show lock
+  if (S.pinHash) {
+    document.getElementById('lock-hint').textContent = `Welcome back${S.name ? ', '+S.name : ''} — enter your code`;
+    initApp();
+    return;
+  }
+
+  // No PIN set (legacy / demo) — go straight in
+  document.getElementById('lock-screen').classList.add('hidden');
+  initApp();
+}
+
+boot();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>True — Try it early</title>
+  <meta name="description" content="True is a private app just for you. Try the early version.">
+  <meta name="theme-color" content="#1A7A6E">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta property="og:title" content="True — Your words. Your truth.">
+  <meta property="og:description" content="A private app just for you. No one else sees what you write.">
+  <meta property="og:type" content="website">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --tr:    #1A7A6E;
+      --trlt:  #E6F5F4;
+      --trdark:#0F5349;
+      --glow:  #25A99A;
+      --text:  #1a1a18;
+      --text2: #5f5e5a;
+      --text3: #888780;
+      --bg:    #ffffff;
+      --bg2:   #f7f6f3;
+      --bg3:   #f0faf9;
+      --border:rgba(0,0,0,0.10);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --text:  #f0ede8;
+        --text2: #a09d97;
+        --text3: #6b6965;
+        --bg:    #1a1917;
+        --bg2:   #222120;
+        --bg3:   #0d2e2b;
+        --border:rgba(255,255,255,0.10);
+        --trlt:  #0d2e2b;
+      }
+    }
+    html, body {
+      min-height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Layout ── */
+    .page { max-width: 480px; margin: 0 auto; padding: 0 1.25rem 3rem; }
+
+    /* ── Hero ── */
+    .hero {
+      padding: 3rem 0 2rem;
+      text-align: center;
+    }
+
+    .logo-mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+
+    .wordmark {
+      font-size: 36px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      color: var(--text);
+    }
+
+    .hero-line {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      line-height: 1.2;
+      margin-bottom: 14px;
+    }
+
+    .hero-sub {
+      font-size: 16px;
+      color: var(--text2);
+      line-height: 1.6;
+      max-width: 340px;
+      margin: 0 auto 32px;
+    }
+
+    /* ── CTA ── */
+    .cta-primary {
+      display: block;
+      width: 100%;
+      padding: 16px;
+      background: var(--tr);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      font-size: 17px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      text-decoration: none;
+      text-align: center;
+      transition: background 0.1s, transform 0.08s;
+      margin-bottom: 12px;
+    }
+    .cta-primary:hover { background: var(--trdark); }
+    .cta-primary:active { transform: scale(0.98); }
+
+    .cta-note {
+      font-size: 13px;
+      color: var(--text3);
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    /* ── Install instructions ── */
+    .install-section {
+      background: var(--bg2);
+      border-radius: 14px;
+      padding: 1.25rem;
+      margin-bottom: 24px;
+    }
+
+    .install-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .install-step {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    .step-num {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--tr);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .step-text {
+      font-size: 14px;
+      color: var(--text2);
+      line-height: 1.5;
+      flex: 1;
+    }
+
+    .step-text strong { color: var(--text); }
+
+    /* Platform tabs */
+    .platform-tabs {
+      display: flex;
+      gap: 2px;
+      background: var(--border);
+      border-radius: 10px;
+      padding: 3px;
+      margin-bottom: 16px;
+    }
+
+    .ptab {
+      flex: 1;
+      padding: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: 7px;
+      background: none;
+      border: none;
+      color: var(--text3);
+      font-family: inherit;
+      transition: all 0.15s;
+      text-align: center;
+    }
+
+    .ptab.active {
+      background: var(--bg);
+      color: var(--text);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+
+    .platform-steps { display: none; }
+    .platform-steps.active { display: block; }
+
+    /* ── What's inside ── */
+    .features {
+      margin-bottom: 28px;
+    }
+
+    .feature-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 14px;
+    }
+
+    .feature-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .feature-item:last-child { border-bottom: none; }
+
+    .feat-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: var(--trlt);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .feat-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 2px;
+    }
+
+    .feat-desc {
+      font-size: 13px;
+      color: var(--text2);
+      line-height: 1.4;
+    }
+
+    /* ── Privacy promise ── */
+    .privacy-block {
+      background: var(--trlt);
+      border-radius: 14px;
+      padding: 1.25rem;
+      margin-bottom: 28px;
+    }
+
+    .privacy-heading {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--tr);
+      margin-bottom: 8px;
+    }
+
+    .privacy-text {
+      font-size: 14px;
+      color: var(--trdark);
+      line-height: 1.6;
+    }
+
+    /* ── Feedback ask ── */
+    .feedback-block {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.25rem;
+      margin-bottom: 28px;
+      text-align: center;
+    }
+
+    .feedback-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .feedback-sub {
+      font-size: 13px;
+      color: var(--text2);
+      line-height: 1.5;
+      margin-bottom: 14px;
+    }
+
+    .feedback-link {
+      display: inline-block;
+      padding: 10px 20px;
+      background: var(--bg2);
+      color: var(--tr);
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      font-family: inherit;
+      border: 1px solid var(--border);
+    }
+
+    /* ── Beta badge ── */
+    .beta-badge {
+      display: inline-block;
+      background: var(--trlt);
+      color: var(--tr);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      padding: 3px 10px;
+      border-radius: 20px;
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 1.5rem 0;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text3);
+      line-height: 1.7;
+    }
+
+    /* ── Divider ── */
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 24px 0;
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <div class="hero">
+    <div class="logo-mark">
+      <svg width="32" height="38" viewBox="0 0 44 52" fill="none">
+        <path d="M22 4C22 4 8 18 8 30C8 38.28 14.27 45 22 45C29.73 45 36 38.28 36 30C36 18 22 4 22 4Z" fill="#1A7A6E"/>
+        <path d="M22 20C22 20 14 28 14 34C14 38.42 17.58 42 22 42C26.42 42 30 38.42 30 34C30 28 22 20 22 20Z" fill="#25A99A" fill-opacity="0.85"/>
+        <path d="M22 30C22 30 18 34 18 37C18 39.21 19.79 41 22 41C24.21 41 26 39.21 26 37C26 34 22 30 22 30Z" fill="white" fill-opacity="0.6"/>
+      </svg>
+      <span class="wordmark">true</span>
+      <span class="beta-badge">BETA</span>
+    </div>
+
+    <div class="hero-line">Your words.<br>Your truth.</div>
+    <div class="hero-sub">A private space to check in with yourself, write, and see how far you've come. No one else sees what you put here.</div>
+
+    <a href="index.html" class="cta-primary">Open True now</a>
+    <div class="cta-note">Works in your browser — no download needed to try it</div>
+  </div>
+
+  <!-- Install to home screen -->
+  <div class="install-section">
+    <div class="install-title">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <rect x="2" y="2" width="14" height="14" rx="3" stroke="#1A7A6E" stroke-width="1.4"/>
+        <path d="M9 6v6M6 9l3 3 3-3" stroke="#1A7A6E" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Add to your home screen — feels like a real app
+    </div>
+
+    <div class="platform-tabs">
+      <button class="ptab active" onclick="showPlatform('ios')">iPhone</button>
+      <button class="ptab" onclick="showPlatform('android')">Android</button>
+    </div>
+
+    <div class="platform-steps active" id="steps-ios">
+      <div class="install-step">
+        <div class="step-num">1</div>
+        <div class="step-text">Open this page in <strong>Safari</strong> (not Chrome)</div>
+      </div>
+      <div class="install-step">
+        <div class="step-num">2</div>
+        <div class="step-text">Tap the <strong>Share button</strong> at the bottom of the screen — it looks like a box with an arrow pointing up</div>
+      </div>
+      <div class="install-step">
+        <div class="step-num">3</div>
+        <div class="step-text">Scroll down and tap <strong>"Add to Home Screen"</strong></div>
+      </div>
+      <div class="install-step">
+        <div class="step-num">4</div>
+        <div class="step-text">Tap <strong>Add</strong> — True will appear on your home screen like any app</div>
+      </div>
+    </div>
+
+    <div class="platform-steps" id="steps-android">
+      <div class="install-step">
+        <div class="step-num">1</div>
+        <div class="step-text">Open this page in <strong>Chrome</strong></div>
+      </div>
+      <div class="install-step">
+        <div class="step-num">2</div>
+        <div class="step-text">Tap the <strong>three dots</strong> in the top right corner</div>
+      </div>
+      <div class="install-step">
+        <div class="step-num">3</div>
+        <div class="step-text">Tap <strong>"Add to Home screen"</strong></div>
+      </div>
+      <div class="install-step">
+        <div class="step-num">4</div>
+        <div class="step-text">Tap <strong>Add</strong> — True will appear on your home screen</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Privacy promise -->
+  <div class="privacy-block">
+    <div class="privacy-heading">This is private. Completely.</div>
+    <div class="privacy-text">What you write in True stays in True. No one else can read it — not your carer, not a social worker, not us. It lives on your phone and nowhere else. You can lock it with your own PIN.</div>
+  </div>
+
+  <!-- What's inside -->
+  <div class="features">
+    <div class="feature-title">What's in True</div>
+
+    <div class="feature-item">
+      <div class="feat-icon">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <circle cx="9" cy="9" r="7" stroke="#1A7A6E" stroke-width="1.4"/>
+          <path d="M6 10.5s1 1.5 3 1.5 3-1.5 3-1.5" stroke="#1A7A6E" stroke-width="1.4" stroke-linecap="round"/>
+          <circle cx="7" cy="8" r="0.9" fill="#1A7A6E"/>
+          <circle cx="11" cy="8" r="0.9" fill="#1A7A6E"/>
+        </svg>
+      </div>
+      <div>
+        <div class="feat-name">Daily check-in</div>
+        <div class="feat-desc">A quick mood check — honest, private, no one judging</div>
+      </div>
+    </div>
+
+    <div class="feature-item">
+      <div class="feat-icon">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <rect x="3" y="2" width="12" height="14" rx="2" stroke="#1A7A6E" stroke-width="1.4"/>
+          <path d="M6 7h6M6 10h4" stroke="#1A7A6E" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div>
+        <div class="feat-name">Journal</div>
+        <div class="feat-desc">Write whatever's on your mind. Prompted or free — your choice</div>
+      </div>
+    </div>
+
+    <div class="feature-item">
+      <div class="feat-icon">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <path d="M9 2C9 2 3 8.5 3 12.5C3 15.54 5.69 18 9 18C12.31 18 15 15.54 15 12.5C15 8.5 9 2 9 2Z" stroke="#1A7A6E" stroke-width="1.4" fill="none"/>
+          <path d="M9 9l-2.5 2.5" stroke="#1A7A6E" stroke-width="1.4" stroke-linecap="round"/>
+          <circle cx="9" cy="14" r="1" fill="#1A7A6E"/>
+        </svg>
+      </div>
+      <div>
+        <div class="feat-name">Milestones</div>
+        <div class="feat-desc">Record the moments that matter — big or small</div>
+      </div>
+    </div>
+
+    <div class="feature-item">
+      <div class="feat-icon">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <path d="M3 4h12M3 7l6 4 6-4M3 4v10a1 1 0 001 1h10a1 1 0 001-1V4" stroke="#1A7A6E" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div>
+        <div class="feat-name">Letter to future you</div>
+        <div class="feat-desc">Write to yourself at 18, 21, 25 — locked until you get there</div>
+      </div>
+    </div>
+
+    <div class="feature-item">
+      <div class="feat-icon">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <circle cx="4.5" cy="14" r="1.5" fill="#1A7A6E"/>
+          <circle cx="9" cy="9" r="1.5" fill="#1A7A6E"/>
+          <circle cx="13.5" cy="5" r="1.5" fill="#1A7A6E"/>
+          <path d="M4.5 14L9 9L13.5 5" stroke="#1A7A6E" stroke-width="1.2" stroke-dasharray="2 1.5"/>
+        </svg>
+      </div>
+      <div>
+        <div class="feat-name">Your journey</div>
+        <div class="feat-desc">Everything in one timeline — see how much you've covered</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Feedback ask -->
+  <div class="feedback-block">
+    <div class="feedback-title">This is an early version — we need your honest thoughts</div>
+    <div class="feedback-sub">You're one of the first people to use True. What works? What doesn't? What's missing? Your feedback shapes what it becomes.</div>
+    <a href="feedback.html" class="feedback-link">Leave feedback (2 mins)</a>
+  </div>
+
+  <div class="divider"></div>
+
+  <footer>
+    <strong style="color:var(--text)">true</strong> — early access beta<br>
+    Your data stays on your device. We don't store anything.<br><br>
+    Questions? <a href="mailto:hello@trueapp.co.uk" style="color:var(--tr)">hello@trueapp.co.uk</a>
+  </footer>
+
+</div>
+
+<script>
+function showPlatform(p) {
+  document.querySelectorAll('.ptab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.platform-steps').forEach(s => s.classList.remove('active'));
+  document.querySelector(`[onclick="showPlatform('${p}')"]`).classList.add('active');
+  document.getElementById('steps-' + p).classList.add('active');
+}
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+}
+</script>
+</body>
+</html>

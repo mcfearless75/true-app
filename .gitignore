@@ -1,0 +1,15 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Dependencies / env
+node_modules/
+.env
+.env.*
+
+# Local tooling — not part of the app
+.claude/
+.claude-flow/
+.swarm/
+ruvector.db
+true-app/

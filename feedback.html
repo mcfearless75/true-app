@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>True — Your feedback</title>
+  <meta name="theme-color" content="#1A7A6E">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --tr:#1A7A6E; --trlt:#E6F5F4; --trdark:#0F5349;
+      --text:#1a1a18; --text2:#5f5e5a; --text3:#888780;
+      --bg:#ffffff; --bg2:#f7f6f3; --border:rgba(0,0,0,0.10); --border2:rgba(0,0,0,0.18);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --text:#f0ede8; --text2:#a09d97; --text3:#6b6965; --bg:#1a1917; --bg2:#222120; --border:rgba(255,255,255,0.10); --border2:rgba(255,255,255,0.18); --trlt:#0d2e2b; }
+    }
+    html, body { min-height:100%; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); -webkit-font-smoothing:antialiased; }
+    .page { max-width:480px; margin:0 auto; padding:2rem 1.25rem 3rem; }
+    .back { display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--tr); text-decoration:none; margin-bottom:24px; }
+    .page-title { font-size:24px; font-weight:700; letter-spacing:-0.02em; margin-bottom:6px; }
+    .page-sub { font-size:14px; color:var(--text2); line-height:1.5; margin-bottom:28px; }
+    .q-block { margin-bottom:24px; }
+    .q-label { font-size:14px; font-weight:600; color:var(--text); margin-bottom:10px; display:block; line-height:1.4; }
+    .q-sub { font-size:12px; color:var(--text3); margin-bottom:10px; }
+    textarea, input[type=text], input[type=number] { width:100%; padding:11px 13px; border:1px solid var(--border2); border-radius:8px; font-family:inherit; font-size:14px; background:var(--bg); color:var(--text); line-height:1.6; transition:border-color .15s; }
+    textarea:focus, input:focus { outline:none; border-color:var(--tr); }
+    textarea { min-height:90px; resize:vertical; }
+    .scale-row { display:flex; gap:6px; }
+    .scale-btn { flex:1; padding:10px 4px; border:1px solid var(--border2); border-radius:8px; font-size:15px; font-weight:600; cursor:pointer; background:none; color:var(--text2); font-family:inherit; transition:all .12s; text-align:center; }
+    .scale-btn.active { border-color:var(--tr); background:var(--trlt); color:var(--tr); }
+    .scale-labels { display:flex; justify-content:space-between; margin-top:5px; }
+    .scale-label { font-size:11px; color:var(--text3); }
+    .choice-row { display:flex; flex-direction:column; gap:7px; }
+    .choice-btn { padding:11px 14px; border:1px solid var(--border2); border-radius:8px; font-size:14px; cursor:pointer; background:none; color:var(--text); font-family:inherit; text-align:left; transition:all .12s; }
+    .choice-btn.active { border-color:var(--tr); background:var(--trlt); color:var(--trdark); font-weight:500; }
+    .tag-row { display:flex; flex-wrap:wrap; gap:7px; }
+    .tag-btn { padding:7px 13px; border:1px solid var(--border2); border-radius:20px; font-size:13px; cursor:pointer; color:var(--text2); background:none; font-family:inherit; transition:all .12s; }
+    .tag-btn.active { border-color:var(--tr); background:var(--trlt); color:var(--tr); font-weight:500; }
+    .divider { height:1px; background:var(--border); margin:24px 0; }
+    .btn-submit { width:100%; padding:14px; background:var(--tr); color:#fff; border:none; border-radius:10px; font-size:16px; font-weight:700; cursor:pointer; font-family:inherit; transition:background .1s; }
+    .btn-submit:hover { background:var(--trdark); }
+    .btn-submit:disabled { background:var(--border2); cursor:not-allowed; }
+    .success { display:none; text-align:center; padding:2.5rem 1rem; }
+    .success-icon { font-size:48px; margin-bottom:16px; }
+    .success-title { font-size:20px; font-weight:700; margin-bottom:8px; }
+    .success-sub { font-size:14px; color:var(--text2); line-height:1.5; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <a href="beta.html" class="back">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    Back
+  </a>
+
+  <div id="form-view">
+    <div class="page-title">Your thoughts</div>
+    <div class="page-sub">This is an early version. Your honest feedback makes it better. Takes about 2 minutes.</div>
+
+    <div class="q-block">
+      <label class="q-label">How old are you? (optional)</label>
+      <input type="number" id="q-age" placeholder="e.g. 16" min="10" max="25" style="width:120px">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="q-block">
+      <label class="q-label">Overall, how does True feel to use?</label>
+      <div class="scale-row" id="q-overall">
+        <button class="scale-btn" data-v="1" onclick="scale('q-overall',1)">1</button>
+        <button class="scale-btn" data-v="2" onclick="scale('q-overall',2)">2</button>
+        <button class="scale-btn" data-v="3" onclick="scale('q-overall',3)">3</button>
+        <button class="scale-btn" data-v="4" onclick="scale('q-overall',4)">4</button>
+        <button class="scale-btn" data-v="5" onclick="scale('q-overall',5)">5</button>
+      </div>
+      <div class="scale-labels"><span class="scale-label">Not great</span><span class="scale-label">Really good</span></div>
+    </div>
+
+    <div class="q-block">
+      <label class="q-label">Does it feel private and safe?</label>
+      <div class="choice-row" id="q-private">
+        <button class="choice-btn" onclick="choice('q-private', this)">Yes — completely</button>
+        <button class="choice-btn" onclick="choice('q-private', this)">Mostly yes</button>
+        <button class="choice-btn" onclick="choice('q-private', this)">Not sure</button>
+        <button class="choice-btn" onclick="choice('q-private', this)">Not really</button>
+      </div>
+    </div>
+
+    <div class="q-block">
+      <label class="q-label">Would you actually use this? Be honest.</label>
+      <div class="choice-row" id="q-use">
+        <button class="choice-btn" onclick="choice('q-use', this)">Yes, every day or most days</button>
+        <button class="choice-btn" onclick="choice('q-use', this)">Maybe, now and then</button>
+        <button class="choice-btn" onclick="choice('q-use', this)">Probably not</button>
+        <button class="choice-btn" onclick="choice('q-use', this)">No</button>
+      </div>
+    </div>
+
+    <div class="q-block">
+      <label class="q-label">Which bits did you actually like? (tap all that apply)</label>
+      <div class="tag-row" id="q-liked">
+        <button class="tag-btn" onclick="tag('q-liked', this)">Mood check-in</button>
+        <button class="tag-btn" onclick="tag('q-liked', this)">Journal prompts</button>
+        <button class="tag-btn" onclick="tag('q-liked', this)">Milestones</button>
+        <button class="tag-btn" onclick="tag('q-liked', this)">About Me</button>
+        <button class="tag-btn" onclick="tag('q-liked', this)">Journey timeline</button>
+        <button class="tag-btn" onclick="tag('q-liked', this)">Letter to future me</button>
+        <button class="tag-btn" onclick="tag('q-liked', this)">The PIN lock</button>
+        <button class="tag-btn" onclick="tag('q-liked', this)">How it looks</button>
+      </div>
+    </div>
+
+    <div class="q-block">
+      <label class="q-label">What felt wrong, weird, or missing?</label>
+      <div class="q-sub">Be straight — this is the most useful thing you can tell us.</div>
+      <textarea id="q-wrong" placeholder="Anything at all..."></textarea>
+    </div>
+
+    <div class="q-block">
+      <label class="q-label">Is there anything you'd want it to do that it doesn't?</label>
+      <textarea id="q-missing" placeholder="e.g. I wish it had..."></textarea>
+    </div>
+
+    <div class="q-block">
+      <label class="q-label">One word that describes how True felt to you</label>
+      <input type="text" id="q-word" placeholder="e.g. calm, safe, useful, boring...">
+    </div>
+
+    <div class="q-block">
+      <label class="q-label">Anything else you want to say?</label>
+      <textarea id="q-other" placeholder="Whatever's on your mind..."></textarea>
+    </div>
+
+    <button class="btn-submit" onclick="submitFeedback()">Send my feedback</button>
+    <div style="font-size:12px;color:var(--text3);text-align:center;margin-top:10px">Completely anonymous. We don't collect your name or any personal info.</div>
+  </div>
+
+  <div class="success" id="success-view">
+    <div class="success-icon">🙏</div>
+    <div class="success-title">Thank you. Genuinely.</div>
+    <div class="success-sub">Your feedback goes directly into how we build True. You're helping make something real for a lot of people.<br><br><a href="index.html" style="color:var(--tr);font-weight:600">Go back to True</a></div>
+  </div>
+
+</div>
+<script>
+const F = {};
+
+function scale(id, v) {
+  document.querySelectorAll(`#${id} .scale-btn`).forEach(b => b.classList.toggle('active', parseInt(b.dataset.v) === v));
+  F[id] = v;
+}
+
+function choice(id, el) {
+  document.querySelectorAll(`#${id} .choice-btn`).forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  F[id] = el.textContent.trim();
+}
+
+function tag(id, el) {
+  el.classList.toggle('active');
+  F[id] = Array.from(document.querySelectorAll(`#${id} .tag-btn.active`)).map(b => b.textContent.trim());
+}
+
+function submitFeedback() {
+  F['age']     = document.getElementById('q-age').value;
+  F['wrong']   = document.getElementById('q-wrong').value;
+  F['missing'] = document.getElementById('q-missing').value;
+  F['word']    = document.getElementById('q-word').value;
+  F['other']   = document.getElementById('q-other').value;
+
+  // In production: POST to a form endpoint (Formspree, Netlify Forms, etc.)
+  // For now: log to console and show success
+  console.log('Feedback:', JSON.stringify(F, null, 2));
+
+  // TODO: Replace with actual endpoint
+  // fetch('https://formspree.io/f/YOUR_ID', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(F) });
+
+  document.getElementById('form-view').style.display = 'none';
+  document.getElementById('success-view').style.display = 'block';
+  window.scrollTo(0, 0);
+}
+</script>
+</body>
+</html>
