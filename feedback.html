@@ -133,7 +133,7 @@
       <textarea id="q-other" placeholder="Whatever's on your mind..."></textarea>
     </div>
 
-    <button class="btn-submit" onclick="submitFeedback()">Send my feedback</button>
+    <button class="btn-submit" id="submit-btn" onclick="submitFeedback()">Send my feedback</button>
     <div style="font-size:12px;color:var(--text3);text-align:center;margin-top:10px">Completely anonymous. We don't collect your name or any personal info.</div>
   </div>
 
@@ -163,19 +163,44 @@ function tag(id, el) {
   F[id] = Array.from(document.querySelectorAll(`#${id} .tag-btn.active`)).map(b => b.textContent.trim());
 }
 
-function submitFeedback() {
+// ─── Where feedback goes ──────────────────────────────────────
+// Paste the Formspree form id here (the bit after /f/ — e.g. 'xayzbwqd').
+// Until it's set, submissions are kept on this device only and nothing
+// is sent anywhere. This form is about the APP, never about the person:
+// no names, no journal content, nothing from anyone's account.
+const FORMSPREE_ID = '';
+
+async function submitFeedback() {
   F['age']     = document.getElementById('q-age').value;
   F['wrong']   = document.getElementById('q-wrong').value;
   F['missing'] = document.getElementById('q-missing').value;
   F['word']    = document.getElementById('q-word').value;
   F['other']   = document.getElementById('q-other').value;
 
-  // In production: POST to a form endpoint (Formspree, Netlify Forms, etc.)
-  // For now: log to console and show success
-  console.log('Feedback:', JSON.stringify(F, null, 2));
+  const btn = document.getElementById('submit-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
 
-  // TODO: Replace with actual endpoint
-  // fetch('https://formspree.io/f/YOUR_ID', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(F) });
+  let sent = false;
+  if (FORMSPREE_ID) {
+    try {
+      const r = await fetch('https://formspree.io/f/' + FORMSPREE_ID, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(F),
+      });
+      sent = r.ok;
+    } catch (e) { sent = false; }
+  }
+
+  // Never lose someone's answers to a dropped connection — keep a local
+  // copy either way so nothing they typed is wasted.
+  if (!sent) {
+    try {
+      const q = JSON.parse(localStorage.getItem('true_feedback_queue') || '[]');
+      q.push({ ...F, at: new Date().toISOString() });
+      localStorage.setItem('true_feedback_queue', JSON.stringify(q));
+    } catch (e) {}
+  }
 
   document.getElementById('form-view').style.display = 'none';
   document.getElementById('success-view').style.display = 'block';

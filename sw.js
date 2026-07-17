@@ -1,4 +1,4 @@
-const CACHE = 'true-v11';
+const CACHE = 'true-v12';
 const SHELL = ['./index.html', './beta.html', './feedback.html', './manifest.json', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
 
 self.addEventListener('install', e => {
