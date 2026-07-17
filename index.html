@@ -173,16 +173,22 @@
     .nav-btn svg { display: block; }
 
     /* ─── Lock Screen ────────────────────────────────────────────── */
+    /* Pinned to the viewport, NOT to #app — #app grows as tall as the home
+       screen behind it, and an absolutely-positioned lock screen inherited
+       that height, centring the keypad inside an 850px box on a 640px phone. */
     #lock-screen {
-      position: absolute;
+      position: fixed;
       inset: 0;
+      max-width: 430px;
+      margin: 0 auto;
       background: var(--bg);
       z-index: 20;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 2rem 1.5rem;
+      padding: 1.25rem 1.5rem;
+      overflow-y: auto;   /* last resort on very short screens; never clipped */
     }
 
     #lock-screen.hidden { display: none; }
@@ -192,7 +198,7 @@
       flex-direction: column;
       align-items: center;
       gap: 8px;
-      margin-bottom: 32px;
+      margin-bottom: 22px;
     }
 
     .lock-wordmark {
@@ -210,7 +216,7 @@
     .pin-dots {
       display: flex;
       gap: 12px;
-      margin-bottom: 28px;
+      margin-bottom: 20px;
     }
 
     .pin-dot {
@@ -587,9 +593,12 @@
     }
 
     /* ─── Onboarding ─────────────────────────────────────────────── */
+    /* Viewport-pinned for the same reason as #lock-screen. */
     #onboarding {
-      position: absolute;
+      position: fixed;
       inset: 0;
+      max-width: 430px;
+      margin: 0 auto;
       background: var(--bg);
       z-index: 15;
       display: flex;
@@ -756,7 +765,7 @@
       <div class="pin-key empty"></div><button class="pin-key" onclick="lockTap(0)">0</button><button class="pin-key del" onclick="lockDel()">⌫</button>
     </div>
     <div class="pin-hint" id="lock-hint">Enter your code</div>
-    <div style="margin-top:22px">
+    <div style="margin-top:16px">
       <button class="link-quiet" onclick="openHelp()">Need to talk to someone right now?</button>
     </div>
   </div>
@@ -1507,6 +1516,7 @@ let obPinStep = 1;
 function showOnboarding() {
   document.getElementById('onboarding').classList.remove('hidden');
   document.getElementById('lock-screen').classList.add('hidden');
+  freezeShell(true);
 }
 
 function obNext(step) {
@@ -1573,6 +1583,7 @@ function updateObDots() {
 
 function finishOnboarding() {
   document.getElementById('onboarding').classList.add('hidden');
+  freezeShell(false);
   S.checkedInToday = false;
   saveState();
   initApp();
@@ -1620,8 +1631,14 @@ function updateLockDots() {
   document.querySelectorAll('#lock-dots .pin-dot').forEach((d,i) => d.classList.toggle('filled', i < lockEntry.length));
 }
 
+// The lock/onboarding screens are pinned to the viewport, but the app behind
+// them is taller — without this the page still scrolls under a fixed overlay,
+// which just feels broken.
+function freezeShell(frozen) { document.body.style.overflow = frozen ? 'hidden' : ''; }
+
 function unlock() {
   document.getElementById('lock-screen').classList.add('hidden');
+  freezeShell(false);
   lockEntry = [];
   updateLockDots();
   document.getElementById('lock-hint').textContent = 'Enter your code';
@@ -1630,6 +1647,7 @@ function unlock() {
 
 function doLock() {
   document.getElementById('lock-screen').classList.remove('hidden');
+  freezeShell(true);
   lockEntry = [];
   updateLockDots();
 }
@@ -2867,12 +2885,14 @@ async function boot() {
   // Has PIN — show lock
   if (S.pinHash) {
     document.getElementById('lock-hint').textContent = `Welcome back${S.name ? ', '+S.name : ''} — enter your code`;
+    freezeShell(true);
     initApp();
     return;
   }
 
   // No PIN set (legacy / demo) — go straight in
   document.getElementById('lock-screen').classList.add('hidden');
+  freezeShell(false);
   initApp();
 }
 
