@@ -849,52 +849,6 @@
     </div>
   </div>
 
-  <!-- ON-DEVICE AI — one-off model download, then it never touches the internet -->
-  <div class="overlay" id="ai-overlay">
-    <div class="overlay-card">
-      <div class="page-title" style="font-size:20px">A thought back, fully on your phone</div>
-      <div id="ai-dl-intro">
-        <div style="font-size:14px;color:var(--text2);line-height:1.6;margin:8px 0 14px">
-          After you journal, True can write a short thought back. The tiny AI that writes it
-          downloads <strong>once</strong> (about 700MB), then lives on your phone.
-          It works with the internet off. Your words never leave this device — there is nowhere for them to go.
-        </div>
-        <div id="ai-warn"></div>
-        <div style="display:flex;gap:8px">
-          <button class="btn-primary" style="flex:1" id="ai-go-btn" onclick="startLocalAIDownload()">Download &amp; turn on</button>
-          <button class="btn-secondary" style="flex:1" onclick="closeAIOverlay()">Not now</button>
-        </div>
-      </div>
-      <div id="ai-dl-progress" style="display:none">
-        <div style="font-size:14px;color:var(--text2);line-height:1.6;margin:8px 0 14px">
-          Getting the AI onto your phone. You can keep using True — just leave this page open.
-        </div>
-        <div class="card-soft" style="text-align:center;font-size:14px;color:var(--trdark)" id="ai-dl-status">Starting…</div>
-      </div>
-      <div id="ai-dl-done" style="display:none">
-        <div style="font-size:14px;color:var(--text);line-height:1.6;margin:8px 0 14px">
-          Done. From now on, a thought back is written right here on your phone — nothing you journal ever leaves it.
-        </div>
-        <button class="btn-primary" style="width:100%" onclick="closeAIOverlay()">Nice</button>
-      </div>
-      <div id="ai-dl-error" style="display:none">
-        <div style="font-size:14px;color:var(--text2);line-height:1.6;margin:8px 0 14px" id="ai-dl-error-text"></div>
-        <!-- The warm message is for the young person. The truth underneath
-             is for whoever has to fix it. Folded away, never in their face. -->
-        <details style="margin-bottom:14px">
-          <summary style="font-size:13px;color:var(--text3);cursor:pointer">What actually went wrong</summary>
-          <pre id="ai-diag" style="font-size:11px;color:var(--text2);background:var(--bg2);padding:10px;border-radius:8px;margin-top:8px;white-space:pre-wrap;word-break:break-word;user-select:all"></pre>
-          <button class="link-quiet" style="font-size:12px;margin-top:6px" onclick="copyDiag()">Copy this</button>
-        </details>
-        <button class="btn-primary" style="width:100%;margin-bottom:8px" onclick="retryLocalAIDownload(false)">Try again</button>
-        <button class="btn-secondary" style="width:100%" onclick="closeAIOverlay()">Not now</button>
-        <div style="text-align:center;margin-top:12px">
-          <button class="link-quiet" onclick="retryLocalAIDownload(true)">Still stuck? Start the download over</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- RESTORE — new device, recovery code in, story back -->
   <div class="overlay" id="restore-overlay" onclick="if(event.target===this)closeRestore()">
     <div class="overlay-card">
@@ -1040,8 +994,6 @@
       </div>
     </div>
 
-    <div class="card-soft" id="journal-reflection" style="display:none;margin-top:12px;border-left:3px solid var(--tr)"></div>
-
     <div class="section-label">PAST ENTRIES</div>
     <div id="journal-list"></div>
   </div>
@@ -1067,9 +1019,6 @@
       <button class="btn-primary" onclick="saveSelfNote()">Save</button>
       <span id="self-saved-msg" style="font-size:13px;color:var(--tr);display:none">Saved.</span>
     </div>
-
-    <div class="section-label">A THOUGHT BACK (OPTIONAL)</div>
-    <div class="card-soft" id="reflect-card"></div>
 
     <div id="me-vault"></div>
 
@@ -1449,7 +1398,6 @@ let S = {
   selectedValues: [],
   goals: [],
   selfNote: '',
-  aiReflect: false,  // "A thought back" — off unless the user turns it on
   backupCode: '',    // recovery code; deriving key + id happens on demand
   backupLast: 0,
   vaultOn: false,    // leaving-care vault (18+) — stays false until they opt in
@@ -1826,7 +1774,6 @@ function saveJournal() {
   const promptUsed = currentPrompt();
   S.journals.push({d, p: promptUsed, t, ts: Date.now()});
   document.getElementById('journal-text').value = '';
-  if (S.aiReflect) requestReflection(t, promptUsed);
   saveState();
   renderJournal();
 }
@@ -1839,7 +1786,6 @@ function renderMe() {
   `).join('');
   renderGoals();
   document.getElementById('self-note-text').value = S.selfNote || '';
-  renderReflectCard();
   renderBackupCard();
   renderVaultCards();
 }
@@ -2052,339 +1998,6 @@ function closeCalm() {
   stopBreath();
   groundReset();
   document.getElementById('calm-overlay').classList.remove('open');
-}
-
-// ─── A thought back — on-device AI reflection ─────────────────
-// Opt-in only. The AI (WebLLM) downloads once and then lives on the
-// phone: no server, no key, works offline. Entries structurally
-// cannot leave the device. Any failure = silent skip, as before.
-const LOCAL_AI_MODEL = localStorage.getItem('true_ai_model') || 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
-const WEBLLM_URL = 'https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.79/+esm';
-
-let _webllm = null, _enginePromise = null, _supported = null;
-let aiPhase = 'idle';   // where a failure happened; surfaced in diagnostics
-
-const withTimeout = (p, ms) => Promise.race([p, new Promise(r => setTimeout(() => r('__timeout'), ms))]);
-
-// An adapter existing is NOT proof the GPU will work — older Android drivers
-// hand back a healthy-looking adapter and then hang on requestDevice(). Ask
-// for the device up front, with a timeout, so a phone that can't run this is
-// told honestly instead of being sent on a 700MB errand that can never finish.
-async function localAISupported() {
-  if (_supported !== null) return _supported;
-  if (!('gpu' in navigator)) return (_supported = false);
-  try {
-    const a = await withTimeout(navigator.gpu.requestAdapter(), 8000);
-    if (!a || a === '__timeout') return (_supported = false);
-    const dev = await withTimeout(a.requestDevice(), 8000);
-    if (!dev || dev === '__timeout') return (_supported = false);
-    try { dev.destroy(); } catch (e) {}
-    return (_supported = true);
-  } catch (e) { return (_supported = false); }
-}
-
-async function loadWebllm() {
-  _webllm = _webllm || await import(WEBLLM_URL);
-  return _webllm;
-}
-
-function localAIEngine(onProgress, onPhase) {
-  if (_enginePromise) return _enginePromise;
-  const phase = p => { aiPhase = p; if (onPhase) onPhase(p); };
-  _enginePromise = (async () => {
-    phase('fetching the AI runtime');
-    const m = await loadWebllm();
-    phase('waking up the graphics chip');
-    const engine = await m.CreateMLCEngine(LOCAL_AI_MODEL, { initProgressCallback: onProgress || (() => {}) });
-    phase('ready');
-    return engine;
-  })();
-  _enginePromise.catch(() => { _enginePromise = null; });
-  return _enginePromise;
-}
-
-// A load that stalled is still "pending" forever — fetch has no timeout of
-// its own. Dropping the handle means the next attempt starts clean instead
-// of being handed back the dead one.
-function resetLocalAIEngine() { _enginePromise = null; }
-
-async function clearLocalAIModel() {
-  try {
-    const m = await loadWebllm();
-    await m.deleteModelAllInfoInCache(LOCAL_AI_MODEL);
-  } catch (e) {}
-  resetLocalAIEngine();
-}
-
-async function renderReflectCard() {
-  const card = document.getElementById('reflect-card');
-  if (!card) return;
-  const supported = await localAISupported();
-  if (!supported) {
-    card.innerHTML = `
-      <div style="font-size:14px;color:var(--text2);line-height:1.6">
-        After you journal, True can write a short thought back — using a tiny AI that lives
-        entirely on your phone, so your words never leave it.
-        This phone can't run that privately yet, so True doesn't offer it here.
-        No shortcut is taken: if it can't happen on your phone, it doesn't happen.
-      </div>`;
-    return;
-  }
-  if (S.aiReflect) {
-    card.innerHTML = `
-      <div style="font-size:14px;color:var(--text);margin-bottom:4px">On.</div>
-      <div style="font-size:13px;color:var(--text3);line-height:1.6;margin-bottom:12px">
-        The AI lives on this phone and never connects to the internet. Thoughts back are written right here.
-      </div>
-      <button class="btn-secondary" onclick="disableLocalAI(false)">Turn off</button>
-      <div style="margin-top:10px">
-        <button class="link-quiet" onclick="disableLocalAI(true)">Remove the AI from my phone (frees space)</button>
-      </div>`;
-  } else {
-    card.innerHTML = `
-      <div style="font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:12px">
-        When you save a journal entry, True can offer a short thought back on what you wrote —
-        written by a tiny AI that lives on your phone. It downloads once, then works with the
-        internet off. Nothing you write ever leaves this device. Off unless you turn it on.
-      </div>
-      <button class="btn-secondary" onclick="openAIOverlay()">Turn on</button>`;
-  }
-}
-
-// A 700MB download can cost real money on pay-as-you-go and won't fit on a
-// full phone. Say so before they tap, not 600MB in.
-const AI_MODEL_BYTES = 750 * 1024 * 1024;
-
-function cellularWarning() {
-  const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-  if (!c) return '';
-  if (c.saveData) return "Your phone is set to save data. This download is about 700MB — it's worth waiting for Wi-Fi.";
-  if (c.type === 'cellular' || /^[23]g$/.test(c.effectiveType || ''))
-    return "You're on mobile data. This download is about 700MB and could use up your allowance — Wi-Fi is much kinder to it.";
-  return '';
-}
-
-async function storageWarning() {
-  try {
-    const { quota, usage } = await navigator.storage.estimate();
-    if (typeof quota !== 'number' || typeof usage !== 'number') return '';
-    const free = quota - usage;
-    if (free < AI_MODEL_BYTES)
-      return 'There may not be room on this phone for the AI (it needs about 700MB free). Clearing some photos or apps first would help.';
-  } catch (e) {}
-  return '';
-}
-
-async function openAIOverlay() {
-  ['ai-dl-progress', 'ai-dl-done', 'ai-dl-error'].forEach(id => document.getElementById(id).style.display = 'none');
-  document.getElementById('ai-dl-intro').style.display = 'block';
-  const warn = document.getElementById('ai-warn');
-  warn.innerHTML = '';
-  document.getElementById('ai-overlay').classList.add('open');
-  const notes = [cellularWarning(), await storageWarning()].filter(Boolean);
-  if (notes.length) {
-    warn.innerHTML = notes.map(n => `
-      <div class="card-soft" style="border-left:3px solid var(--warn);margin-bottom:12px">
-        <div style="font-size:13px;color:var(--text);line-height:1.6">${n}</div>
-      </div>`).join('');
-    document.getElementById('ai-go-btn').textContent = 'Download anyway';
-  }
-}
-
-function closeAIOverlay() { document.getElementById('ai-overlay').classList.remove('open'); }
-
-// If the connection dies mid-download, fetch just waits — forever. Without
-// this watchdog the screen sits on "Getting ready…" looking like progress
-// when nothing is happening.
-const AI_STALL_MS = 60000;
-
-// Diagnostics for whoever has to fix it — the young person only ever sees
-// the warm sentence unless they go looking. Collected on failure because a
-// phone that fails here is a phone we cannot otherwise see.
-async function aiDiagnostics(err) {
-  const lines = [];
-  lines.push('True — AI download diagnostics');
-  lines.push('when:   ' + new Date().toISOString());
-  lines.push('model:  ' + LOCAL_AI_MODEL);
-  lines.push('error:  ' + (err ? (err.stack || err.message || String(err)) : '(stalled — no progress for 60s)'));
-  lines.push('phase:  ' + aiPhase);
-  lines.push('ua:     ' + navigator.userAgent);
-  const c = navigator.connection;
-  if (c) lines.push('net:    type=' + c.type + ' effective=' + c.effectiveType + ' saveData=' + c.saveData);
-  try {
-    const { quota, usage } = await navigator.storage.estimate();
-    lines.push('storage: free=' + Math.round((quota - usage) / 1e6) + 'MB of ' + Math.round(quota / 1e6) + 'MB quota');
-    lines.push('persisted: ' + await navigator.storage.persisted());
-  } catch (e) { lines.push('storage: unavailable'); }
-  try {
-    const a = await navigator.gpu.requestAdapter();
-    if (!a) lines.push('webgpu: adapter NULL');
-    else {
-      const L = a.limits;
-      lines.push('gpu:    ' + JSON.stringify(a.info || {}));
-      lines.push('limits: maxBuffer=' + Math.round(L.maxBufferSize / 1e6) + 'MB' +
-                 ' maxStorageBinding=' + Math.round(L.maxStorageBufferBindingSize / 1e6) + 'MB' +
-                 ' maxWorkgroupStorage=' + L.maxComputeWorkgroupStorageSize);
-      // The decisive test: a healthy adapter can still refuse to hand over a
-      // device, and that is invisible from everything above.
-      const t0 = Date.now();
-      const dev = await withTimeout(a.requestDevice(), 10000);
-      lines.push('device: ' + (dev === '__timeout' ? 'TIMED OUT after 10s — this is the fault'
-                             : dev ? 'ok in ' + (Date.now() - t0) + 'ms' : 'refused'));
-      if (dev && dev !== '__timeout') { try { dev.destroy(); } catch (e) {} }
-    }
-  } catch (e) { lines.push('webgpu: ' + e.message); }
-  // Can we even reach the CDN the runtime lives on?
-  try {
-    const t0 = Date.now();
-    const r = await withTimeout(fetch('https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.79/package.json', { method: 'GET' }), 10000);
-    lines.push('cdn:    ' + (r === '__timeout' ? 'TIMED OUT after 10s' : r.status + ' in ' + (Date.now() - t0) + 'ms'));
-  } catch (e) { lines.push('cdn:    ' + e.message); }
-  return lines.join('\n');
-}
-
-async function aiDownloadFailed(msg, err) {
-  document.getElementById('ai-dl-progress').style.display = 'none';
-  document.getElementById('ai-dl-error').style.display = 'block';
-  document.getElementById('ai-dl-error-text').textContent = msg;
-  const diag = document.getElementById('ai-diag');
-  diag.textContent = 'Collecting…';
-  diag.textContent = await aiDiagnostics(err);
-}
-
-async function copyDiag() {
-  try { await navigator.clipboard.writeText(document.getElementById('ai-diag').textContent); } catch (e) {}
-}
-
-async function startLocalAIDownload() {
-  document.getElementById('ai-dl-intro').style.display = 'none';
-  document.getElementById('ai-dl-error').style.display = 'none';
-  document.getElementById('ai-dl-progress').style.display = 'block';
-  const status = document.getElementById('ai-dl-status');
-  status.textContent = 'Getting ready…';
-  try { await navigator.storage?.persist?.(); } catch (e) {}
-
-  let settled = false;
-  let lastTick = Date.now();
-  const watchdog = setInterval(() => {
-    if (settled || Date.now() - lastTick < AI_STALL_MS) return;
-    settled = true;
-    clearInterval(watchdog);
-    resetLocalAIEngine();
-    aiDownloadFailed(
-      aiPhase === 'waking up the graphics chip'
-        ? "This phone's graphics chip won't start the AI up. That's the phone, not you — everything else in True works exactly the same without it."
-        : 'The download stopped — your connection probably dropped. Nothing is broken. Try again on Wi-Fi and it\'ll pick up where it left off.',
-      null);
-  }, 4000);
-
-  try {
-    // Each phase gets its own clock: fetching the runtime on slow mobile data
-    // is not the same as a hung GPU, and calling both "stalled" hides which.
-    const engine = await localAIEngine(p => {
-      lastTick = Date.now();
-      aiPhase = 'downloading the AI';   // CreateMLCEngine does GPU init *and*
-      // the download; once progress ticks we are past the GPU and onto the wire
-      const pct = p && typeof p.progress === 'number' ? Math.round(p.progress * 100) : 0;
-      status.textContent = pct > 0 ? `Downloading — ${pct}%` : 'Getting ready…';
-    }, () => { lastTick = Date.now(); });
-    if (settled) return;
-    // Warm-up: the GPU compiles the AI's shaders on the very first run,
-    // which can take minutes. Pay that cost here, behind the progress
-    // screen, so the first real thought back doesn't hang.
-    lastTick = Date.now();
-    status.textContent = 'Nearly there — setting up on your phone. This bit can take a few minutes, and only happens once.';
-    clearInterval(watchdog);  // shader compilation reports nothing; don't call it a stall
-    try { await engine.chat.completions.create({ messages: [{ role: 'user', content: 'Hi' }], max_tokens: 4 }); } catch (e) {}
-    if (settled) return;
-    settled = true;
-    S.aiReflect = true;
-    saveState();
-    document.getElementById('ai-dl-progress').style.display = 'none';
-    document.getElementById('ai-dl-done').style.display = 'block';
-    renderReflectCard();
-  } catch (e) {
-    if (settled) return;
-    settled = true;
-    clearInterval(watchdog);
-    resetLocalAIEngine();
-    // The common one by far: a chunk was mid-flight when the signal wobbled.
-    // Each chunk is fetched and stored in one go with no resume, so a blip
-    // kills it outright. Say that plainly instead of blaming their phone.
-    const dropped = /network|cache|fetch|failed to execute/i.test((e && e.message) || '');
-    aiDownloadFailed(dropped
-      ? "The connection kept breaking up, so the download couldn't finish. This one needs steady Wi-Fi — on mobile data it'll keep stopping like this. Nothing's broken, and nothing else in True needs it."
-      : "That didn't work — maybe the connection dropped, or your phone ran out of room. Nothing's broken; you can try again any time.", e);
-  }
-}
-
-// Retry from scratch: bin whatever half-downloaded before starting, so a
-// broken part-file can't wedge every future attempt.
-async function retryLocalAIDownload(fresh) {
-  document.getElementById('ai-dl-error').style.display = 'none';
-  document.getElementById('ai-dl-progress').style.display = 'block';
-  document.getElementById('ai-dl-status').textContent = fresh ? 'Clearing the last attempt…' : 'Getting ready…';
-  if (fresh) await clearLocalAIModel(); else resetLocalAIEngine();
-  startLocalAIDownload();
-}
-
-async function disableLocalAI(removeModel) {
-  if (removeModel && !confirm('Remove the AI from your phone? Turning it back on later means downloading it again.')) return;
-  S.aiReflect = false;
-  saveState();
-  if (removeModel) await clearLocalAIModel();
-  renderReflectCard();
-}
-
-// Crisis gate: a small model must not improvise here. The check runs
-// on this device only; on a match we skip the AI and point to real people.
-const CRISIS_PATTERNS = /suicid|kill (myself|me)|end (my|it) (life|all)|self.?harm|hurt(ing)? myself|cut(ting)? myself|don'?t want to (be here|live|wake up)|better off dead|overdos/i;
-
-function localAISystemPrompt(ageBand) {
-  const simpler = ageBand === '10-13' ? ' Use simple, short sentences a 12-year-old reads easily.' : '';
-  return 'You are the quiet, kind voice inside True, a completely private journal app for young people in the UK. ' +
-    'Someone aged ' + (ageBand || '14-16') + ' just wrote the journal entry below. ' +
-    'Reply with 2 or 3 short, warm sentences in UK English. Speak like a wise friend, never a therapist. ' +
-    'Reflect back what they said and notice one strength or something true about them. One gentle question is fine. ' +
-    'Never give advice, never diagnose, never tell them to talk to an adult, never mention being an AI. ' +
-    'Plain sentences only, no lists, no headings.' + simpler;
-}
-
-async function requestReflection(entry, promptUsed) {
-  const el = document.getElementById('journal-reflection');
-  try {
-    if (CRISIS_PATTERNS.test(entry)) {
-      el.style.display = 'block';
-      el.innerHTML = `
-        <div class="section-label" style="margin-top:0">FROM TRUE</div>
-        <div style="font-size:14px;color:var(--text);line-height:1.65">
-          That sounds really heavy. A thought back from an app isn't enough for this — real people are better.
-        </div>
-        <button class="link-quiet" style="margin-top:10px;color:var(--tr)" onclick="openHelp()">Someone to talk to right now &rarr;</button>`;
-      return;
-    }
-    el.style.display = 'block';
-    el.innerHTML = '<div style="font-size:13px;color:var(--text3)">True is thinking &mdash; right here on your phone&hellip;</div>';
-    const engine = await localAIEngine();
-    const res = await engine.chat.completions.create({
-      messages: [
-        { role: 'system', content: localAISystemPrompt(S.age) },
-        { role: 'user', content: `The prompt they were writing to: "${promptUsed}"\n\nTheir entry:\n${entry.slice(0, 4000)}` },
-      ],
-      temperature: 0.7,
-      max_tokens: 110,
-    });
-    let text = (res.choices?.[0]?.message?.content || '').replace(/[*_#>`]/g, '').trim();
-    const sentences = text.match(/[^.!?]+[.!?]+/g);
-    if (sentences) text = sentences.slice(0, 4).join('').trim();
-    if (!text || text.length < 15) throw new Error('empty');
-    el.innerHTML = `
-      <div class="section-label" style="margin-top:0">A THOUGHT BACK</div>
-      <div style="font-size:14px;color:var(--text);line-height:1.65">${esc(text)}</div>
-      <div style="font-size:12px;color:var(--text3);margin-top:10px">Written just now by a tiny AI that lives on this phone. Nothing left your device.</div>`;
-  } catch (e) {
-    el.style.display = 'none';
-  }
 }
 
 // ─── Zero-knowledge backup ────────────────────────────────────

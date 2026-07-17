@@ -53,7 +53,7 @@ See REIGNITE.md for full detail and next steps.
 1. Age-adaptive UI (under 14 vs 16+) — currentAge() helper exists
 2. Hash the PIN (Web Crypto SHA-256)
 3. Data export (JSON download — GDPR + care leaver continuity)
-4. ~~AI journalling~~ DONE July 2026 — fully on-device via WebLLM (Llama 3.2 1B, WebGPU). No server, no API key; reflect.mjs deleted. Entries structurally cannot leave the device.
+4. ~~AI journalling~~ **CUT July 2026 — do not rebuild without new evidence.** Tried on-device WebLLM (Llama 3.2 1B). It worked technically but a 1B model cannot read the understatement care-experienced young people write in: it called a fourth placement move "kind of funny", read a child masking to get rid of a social worker as them "being supportive" of her, and wrote about a girl whose mum cancelled contact in the third person, like a case note. Not a prompt problem — a comprehension ceiling. True is stronger with no AI: zero third-party origins, and "no AI reads your words either" is a cleaner pitch. See docs/superpowers/specs/2026-07-17-on-device-ai-design.md.
 5. Formspree on feedback.html
 6. Capacitor.js for iOS/Android (only after beta validation)
 

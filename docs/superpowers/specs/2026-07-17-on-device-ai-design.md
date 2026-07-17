@@ -1,6 +1,37 @@
 # On-Device AI "A Thought Back" — Design Spec
 
-**Date:** 17 July 2026 · **Status:** Approved (user, this session)
+> **OUTCOME: BUILT, TESTED ON A REAL DEVICE, THEN CUT — 17 July 2026.**
+> The design below was implemented in full and worked: Llama 3.2 1B downloaded and
+> generated on-device on an Android 10 phone over Wi-Fi, with no server involved.
+> It was removed anyway, because the output was not fit for the users.
+>
+> **Why it was cut.** Tested against entries written the way care-experienced young
+> people actually write — in understatement. The model:
+> - called a young person's fourth placement move *"kind of funny"*;
+> - read a child masking ("I said all the right things so she'd leave quicker") as
+>   them being *"considerate"* and *"supportive"* of their social worker — a total inversion;
+> - told a girl whose mum cancelled contact a third time that *"it takes a lot of
+>   courage to acknowledge when we're wrong"*;
+> - switched to the **third person** — *"they're feeling pretty down about their mum's
+>   behaviour"* — writing a case note about a child, inside an app whose promise is
+>   that nobody is reading. Then added *"You're a brilliant writer, by the way."*
+>
+> These are not instruction-following failures that a better prompt would fix; they are
+> a comprehension ceiling. Reading what sits under "I'm not sad about it I just feel
+> stupid" is the whole job, and a 1B model cannot do it. A smaller model would be worse;
+> a 3B is a ~2GB download these users' phones and data plans cannot take.
+>
+> **Do not rebuild without new evidence** — i.e. re-run the hard-entry tests above
+> against any candidate model first, and only ship if it reads the subtext.
+>
+> **What was kept:** True now has zero third-party origins and a much simpler CSP.
+> "No AI reads your words either" is a stronger sentence than any caveat.
+>
+> The delivery lessons were real and are worth remembering: an adapter is not a device;
+> `Cache.add()` has no resume so 700MB over flaky mobile data can never finish; and a
+> diagnostics panel beat three of my confident wrong hypotheses in a row.
+
+**Date:** 17 July 2026 · **Status:** Cut after real-device testing (was: Approved)
 **Strategy context:** Step 3 of the agreed sequence: ZK backup (done) → vault mode (done) → **on-device AI (WebLLM)** → anonymous council dashboard.
 
 ## Decision
