@@ -18,7 +18,21 @@
     /* ─── Reset & Base ─────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    /* ═══════════════════════════════════════════════════════════════
+       COLOUR TOKENS — read this before any rebrand.
+
+       A rebrand changes ONLY the BRAND block below (and the icons +
+       BRAND_EXPORT in the script — see REBRAND.md).
+
+       It must NEVER touch the MOOD block. Those five colours carry
+       meaning, not identity: they are the difference between "really
+       low" and "really good". The Ember→True rebrand blanket-replaced
+       hexes and turned "really low" into brand teal, so the mood scale
+       silently stopped meaning anything. Tokens exist so that a
+       find-and-replace on the brand can no longer reach them.
+       ═══════════════════════════════════════════════════════════════ */
     :root {
+      /* ── BRAND — safe to change in a rebrand ───────────────────── */
       --tr:     #1A7A6E;
       --trlt:   #E6F5F4;
       --trdark: #0F5349;
@@ -27,7 +41,25 @@
       --acc:    #1D6FA4;
       --ash:    #2C2C2A;
       --warm:   #F1EFE8;
+
+      /* ── MOOD — SEMANTIC. NEVER rebrand these. ─────────────────── */
+      --mood-1: #C94F35;  /* really low   */
+      --mood-2: #D98E2B;  /* not great    */
+      --mood-3: #888780;  /* okay — grey by coincidence, not kinship with --text3 */
+      --mood-4: #1D9E75;  /* pretty good  */
+      --mood-5: #3B6D11;  /* really good  */
+
+      /* ── CATEGORY badges — their own scale, borrowed from nothing ─ */
+      --cat-school-bg:   #E6F1FB;  --cat-school-fg:   #185FA5;
+      --cat-personal-bg: #E6F5F4;  --cat-personal-fg: #0F5349;
+      --cat-achieve-bg:  #EAF3DE;  --cat-achieve-fg:  #3B6D11;
+      --cat-new-bg:      #E6F2FA;  --cat-new-fg:      #854F0B;
+      --cat-rel-bg:      #FBEAF0;  --cat-rel-fg:      #993556;
+
+      /* ── UI neutrals ───────────────────────────────────────────── */
       --warn:   #9A5B0A;  /* UI caution only — deliberately NOT a mood colour */
+      --rec:    #C94F35;  /* "recording" red — same value as --mood-1 today, but
+                             a different thing: moving one must not move the other */
       --text:   #1a1a18;
       --text2:  #5f5e5a;
       --text3:  #888780;
@@ -376,7 +408,7 @@
     }
     .ms-audio { width: 100%; margin-top: 8px; height: 36px; }
     .btn-secondary.recording {
-      color: #C94F35; border-color: #C94F35;
+      color: var(--rec); border-color: var(--rec);
     }
 
     /* Calm space — breathing circle */
@@ -663,7 +695,7 @@
     .letter-status { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600; padding:3px 8px; border-radius:20px; }
     .status-locked { background:var(--bg2); color:var(--text3); }
     .status-ready { background:var(--gllt); color:var(--acc); }
-    .status-opened { background:#EAF3DE; color:#3B6D11; }
+    .status-opened { background:var(--cat-achieve-bg); color:var(--cat-achieve-fg); }
     .reveal-card { background:var(--gllt); border:1px solid rgba(29,111,164,0.3); border-radius:var(--radius); padding:1.25rem; margin-bottom:12px; display:none; }
     .reveal-card.visible { display:block; }
     .reveal-letter-body { font-size:14px; color:var(--text); line-height:1.8; white-space:pre-wrap; font-style:italic; }
@@ -677,8 +709,8 @@
   <div id="onboarding" class="hidden">
     <div class="ob-logo">
       <svg width="22" height="28" viewBox="0 0 44 52" fill="none">
-        <path d="M22 4C22 4 8 18 8 30C8 38.28 14.27 45 22 45C29.73 45 36 38.28 36 30C36 18 22 4 22 4Z" fill="#1A7A6E"/>
-        <path d="M22 20C22 20 14 28 14 34C14 38.42 17.58 42 22 42C26.42 42 30 38.42 30 34C30 28 22 20 22 20Z" fill="#25A99A" fill-opacity="0.85"/>
+        <path d="M22 4C22 4 8 18 8 30C8 38.28 14.27 45 22 45C29.73 45 36 38.28 36 30C36 18 22 4 22 4Z" fill="var(--tr)"/>
+        <path d="M22 20C22 20 14 28 14 34C14 38.42 17.58 42 22 42C26.42 42 30 38.42 30 34C30 28 22 20 22 20Z" fill="var(--glow)" fill-opacity="0.85"/>
         <path d="M22 30C22 30 18 34 18 37C18 39.21 19.79 41 22 41C24.21 41 26 39.21 26 37C26 34 22 30 22 30Z" fill="white" fill-opacity="0.6"/>
       </svg>
       <span style="font-size:20px;font-weight:700;letter-spacing:-0.03em;color:var(--text)">true</span>
@@ -748,8 +780,8 @@
   <div id="lock-screen">
     <div class="lock-brand">
       <svg width="36" height="44" viewBox="0 0 44 52" fill="none">
-        <path d="M22 4C22 4 8 18 8 30C8 38.28 14.27 45 22 45C29.73 45 36 38.28 36 30C36 18 22 4 22 4Z" fill="#1A7A6E"/>
-        <path d="M22 20C22 20 14 28 14 34C14 38.42 17.58 42 22 42C26.42 42 30 38.42 30 34C30 28 22 20 22 20Z" fill="#25A99A" fill-opacity="0.85"/>
+        <path d="M22 4C22 4 8 18 8 30C8 38.28 14.27 45 22 45C29.73 45 36 38.28 36 30C36 18 22 4 22 4Z" fill="var(--tr)"/>
+        <path d="M22 20C22 20 14 28 14 34C14 38.42 17.58 42 22 42C26.42 42 30 38.42 30 34C30 28 22 20 22 20Z" fill="var(--glow)" fill-opacity="0.85"/>
         <path d="M22 30C22 30 18 34 18 37C18 39.21 19.79 41 22 41C24.21 41 26 39.21 26 37C26 34 22 30 22 30Z" fill="white" fill-opacity="0.6"/>
       </svg>
       <div class="lock-wordmark">true</div>
@@ -781,8 +813,8 @@
   <div id="header">
     <div class="true-logo">
       <svg width="18" height="22" viewBox="0 0 44 52" fill="none">
-        <path d="M22 4C22 4 8 18 8 30C8 38.28 14.27 45 22 45C29.73 45 36 38.28 36 30C36 18 22 4 22 4Z" fill="#1A7A6E"/>
-        <path d="M22 20C22 20 14 28 14 34C14 38.42 17.58 42 22 42C26.42 42 30 38.42 30 34C30 28 22 20 22 20Z" fill="#25A99A" fill-opacity="0.85"/>
+        <path d="M22 4C22 4 8 18 8 30C8 38.28 14.27 45 22 45C29.73 45 36 38.28 36 30C36 18 22 4 22 4Z" fill="var(--tr)"/>
+        <path d="M22 20C22 20 14 28 14 34C14 38.42 17.58 42 22 42C26.42 42 30 38.42 30 34C30 28 22 20 22 20Z" fill="var(--glow)" fill-opacity="0.85"/>
         <path d="M22 30C22 30 18 34 18 37C18 39.21 19.79 41 22 41C24.21 41 26 39.21 26 37C26 34 22 30 22 30Z" fill="white" fill-opacity="0.6"/>
       </svg>
       <span class="true-wordmark">true</span>
@@ -962,23 +994,23 @@
     <div class="page-sub">Be honest with yourself. Nobody else sees this.</div>
 
     <div class="mood-row" onclick="selectMood(1,'Really low')" data-mv="1">
-      <div class="mood-dot" style="background:#C94F35"></div>
+      <div class="mood-dot" style="background:var(--mood-1)"></div>
       <div><div class="mood-label">Really low</div><div class="mood-desc">Everything feels heavy</div></div>
     </div>
     <div class="mood-row" onclick="selectMood(2,'Not great')" data-mv="2">
-      <div class="mood-dot" style="background:#D98E2B"></div>
+      <div class="mood-dot" style="background:var(--mood-2)"></div>
       <div><div class="mood-label">Not great</div><div class="mood-desc">A bit down or stressed</div></div>
     </div>
     <div class="mood-row" onclick="selectMood(3,'Okay')" data-mv="3">
-      <div class="mood-dot" style="background:#888780"></div>
+      <div class="mood-dot" style="background:var(--mood-3)"></div>
       <div><div class="mood-label">Okay</div><div class="mood-desc">Getting through</div></div>
     </div>
     <div class="mood-row" onclick="selectMood(4,'Pretty good')" data-mv="4">
-      <div class="mood-dot" style="background:#1D9E75"></div>
+      <div class="mood-dot" style="background:var(--mood-4)"></div>
       <div><div class="mood-label">Pretty good</div><div class="mood-desc">Things are alright</div></div>
     </div>
     <div class="mood-row" onclick="selectMood(5,'Really good')" data-mv="5">
-      <div class="mood-dot" style="background:#3B6D11"></div>
+      <div class="mood-dot" style="background:var(--mood-5)"></div>
       <div><div class="mood-label">Really good</div><div class="mood-desc">Feeling it today</div></div>
     </div>
 
@@ -1246,15 +1278,21 @@ No one else will read this. It locks until the date you choose."></textarea>
 
 <script>
 // ─── Constants ────────────────────────────────────────────────
-const MOOD_COLORS = {1:'#C94F35', 2:'#D98E2B', 3:'#888780', 4:'#1D9E75', 5:'#3B6D11'};
+// Defined once in :root. These point at the tokens so a rebrand physically
+// cannot reach the mood scale — see the COLOUR TOKENS block in the stylesheet.
+const MOOD_COLORS = {1:'var(--mood-1)', 2:'var(--mood-2)', 3:'var(--mood-3)', 4:'var(--mood-4)', 5:'var(--mood-5)'};
 
 const CAT_STYLES = {
-  'School':         {bg:'#E6F1FB', color:'#185FA5'},
-  'Personal':       {bg:'#E6F5F4', color:'#0F5349'},
-  'Achievement':    {bg:'#EAF3DE', color:'#3B6D11'},
-  'New experience': {bg:'#E6F2FA', color:'#854F0B'},
-  'Relationship':   {bg:'#FBEAF0', color:'#993556'},
+  'School':         {bg:'var(--cat-school-bg)',   color:'var(--cat-school-fg)'},
+  'Personal':       {bg:'var(--cat-personal-bg)', color:'var(--cat-personal-fg)'},
+  'Achievement':    {bg:'var(--cat-achieve-bg)',  color:'var(--cat-achieve-fg)'},
+  'New experience': {bg:'var(--cat-new-bg)',      color:'var(--cat-new-fg)'},
+  'Relationship':   {bg:'var(--cat-rel-bg)',      color:'var(--cat-rel-fg)'},
 };
+
+// The exported story is a STANDALONE document — the app's :root doesn't reach
+// it, so it carries its own copy of the brand. A rebrand must change this too.
+const BRAND_EXPORT = { tr: '#1A7A6E', trdark: '#0F5349', trlt: '#E6F5F4', acc: '#1D6FA4' };
 
 // ─── Age-adaptive copy ────────────────────────────────────────
 // The 10-13 band gets plainer words. Same app, same features, same
@@ -2523,7 +2561,7 @@ function renderLetterView() {
   document.getElementById('letter-nudges').innerHTML = letterNudgeSet.map(p => `
     <div style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;padding:4px 0" onclick="useLetterPrompt(this)" data-p="${p.replace(/"/g,'&quot;')}">
       <div style="width:18px;height:18px;border-radius:50%;background:var(--gllt);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5h6M5 2l3 3-3 3" stroke="#1D6FA4" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5h6M5 2l3 3-3 3" stroke="var(--acc)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
       <span style="font-size:13px;color:var(--text2);line-height:1.5">${p}</span>
     </div>`).join('');
@@ -2612,7 +2650,7 @@ function renderLettersList() {
     return `<div class="locked-letter">
       <div class="lock-icon-wrap ${ready || opened ? 'unlocked' : ''}">
         ${ready || opened
-          ? '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 10h12M4 7h14M4 13h8" stroke="#1D6FA4" stroke-width="1.4" stroke-linecap="round"/></svg>'
+          ? '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 10h12M4 7h14M4 13h8" stroke="var(--acc)" stroke-width="1.4" stroke-linecap="round"/></svg>'
           : '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="5" y="9" width="10" height="8" rx="2" stroke="#888780" stroke-width="1.4"/><path d="M7 9V7a3 3 0 016 0v2" stroke="#888780" stroke-width="1.4" stroke-linecap="round"/></svg>'}
       </div>
       <div style="flex:1;min-width:0">
@@ -2678,7 +2716,7 @@ function renderJourney() {
 
 function timelineHTML(filtered) {
   return filtered.map((item, i) => {
-    const dotColor = item.type === 'mood' ? MOOD_COLORS[item.data.v] : item.type === 'milestone' ? '#1A7A6E' : item.type === 'letter' ? '#1D6FA4' : '#888780';
+    const dotColor = item.type === 'mood' ? MOOD_COLORS[item.data.v] : item.type === 'milestone' ? 'var(--tr)' : item.type === 'letter' ? 'var(--acc)' : 'var(--text3)';
     const typeLabel = {mood:'Check-in', journal:'Journal', milestone:msWord(true), letter:'Future Letter'}[item.type];
     let body = '';
 
@@ -2858,19 +2896,28 @@ async function exportStory() {
   ].filter(Boolean).join('\n');
 
   const today = new Date().toISOString().slice(0, 10);
+  // The mood scale is read from the live :root, so it has exactly one
+  // definition and this document can never drift out of step with the app.
+  const rootStyle = getComputedStyle(document.documentElement);
+  const moodPalette = [1, 2, 3, 4, 5].map(i => `--mood-${i}:${rootStyle.getPropertyValue('--mood-' + i).trim()}`).join(';');
   const doc = `<!DOCTYPE html>
 <html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>My Story${S.name ? ' — ' + esc(S.name) : ''}</title>
 <style>
+  /* Standalone document: it carries its own palette because the app's
+     :root can't reach it. Moods come from the app; brand from BRAND_EXPORT.
+     Paper colours stay literal — this is always a light document, even if
+     the phone is in dark mode. */
+  :root{${moodPalette}}
   body{font-family:Georgia,'Times New Roman',serif;max-width:640px;margin:0 auto;padding:40px 24px;color:#1a1a18;background:#FDFCF9;line-height:1.65}
-  h1{font-size:34px;margin:0;color:#0F5349}
-  .tag{color:#1A7A6E;font-style:italic;margin:6px 0 4px}
+  h1{font-size:34px;margin:0;color:${BRAND_EXPORT.trdark}}
+  .tag{color:${BRAND_EXPORT.tr};font-style:italic;margin:6px 0 4px}
   .meta{font-size:14px;color:#888780;margin-bottom:36px}
-  .about{background:#E6F5F4;border-radius:12px;padding:18px 22px;margin-bottom:36px}
+  .about{background:${BRAND_EXPORT.trlt};border-radius:12px;padding:18px 22px;margin-bottom:36px}
   .about p{margin:6px 0;font-size:15px}
-  article{border-left:3px solid #E6F5F4;padding:2px 0 2px 20px;margin-bottom:28px}
+  article{border-left:3px solid ${BRAND_EXPORT.trlt};padding:2px 0 2px 20px;margin-bottom:28px}
   .w{font-size:13px;color:#888780;margin-bottom:2px}
-  .k{font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#1A7A6E;font-weight:700;margin-bottom:4px}
+  .k{font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:${BRAND_EXPORT.tr};font-weight:700;margin-bottom:4px}
   .q{font-style:italic;color:#555;font-size:14px;margin-bottom:2px}
   .mood{font-weight:600;font-size:16px}
   .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px}
@@ -2878,7 +2925,7 @@ async function exportStory() {
   img{max-width:100%;border-radius:10px;margin-top:8px}
   audio{width:100%;margin-top:8px}
   details{margin-top:4px}
-  summary{cursor:pointer;color:#1D6FA4;font-size:15px}
+  summary{cursor:pointer;color:${BRAND_EXPORT.acc};font-size:15px}
   footer{margin-top:48px;font-size:13px;color:#888780;border-top:1px solid #eee;padding-top:16px}
   @media print{body{background:#fff}article{break-inside:avoid}}
 </style></head><body>
