@@ -792,6 +792,8 @@
     <div class="section-label">LAST MILESTONE</div>
     <div id="home-milestone"></div>
 
+    <div id="home-vault"></div>
+
     <div style="text-align:center;margin-top:30px;padding-bottom:8px">
       <button class="link-quiet" onclick="openCalm()">Take a minute</button>
       <span style="color:var(--text3);font-size:13px"> &middot; </span>
@@ -1019,6 +1021,8 @@
       <button class="btn-secondary" id="reflect-toggle" onclick="toggleReflect()">Turn on</button>
     </div>
 
+    <div id="me-vault"></div>
+
     <div class="section-label">MY DATA</div>
     <div class="card-soft">
       <div style="font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:12px">
@@ -1150,6 +1154,35 @@ No one else will read this. It locks until the date you choose."></textarea>
       <button class="pill" data-f="letter" onclick="setJourneyFilter('letter')">Letters</button>
     </div>
     <div id="journey-list"></div>
+  </div>
+
+  <!-- VAULT — leaving-care archive (18+). Read-and-export only; everything generated on-device. -->
+  <div class="view" id="view-vault">
+    <div class="page-title">My Vault</div>
+    <div class="page-sub">Your whole story, kept by you. Yours to take anywhere.</div>
+
+    <div class="card-soft" style="margin-bottom:16px">
+      <div class="section-label" style="margin-top:0;color:var(--trdark)">MY STORY</div>
+      <div id="vault-stats"></div>
+    </div>
+
+    <div class="section-label">TAKE MY STORY WITH ME</div>
+    <div class="card-soft">
+      <div style="font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:12px">
+        Most people who leave care have to ask for their file — someone else's notes about them.
+        This is different: the record <strong>you</strong> kept. One file that opens anywhere, no app needed.
+        It's made on this device and goes only where you put it.
+      </div>
+      <button class="btn-primary" style="width:100%;margin-bottom:8px" onclick="exportStory()">Download my story</button>
+      <button class="btn-secondary" style="width:100%" onclick="exportData()">Download my everything (JSON)</button>
+      <div id="vault-export-msg" style="font-size:13px;color:var(--tr);margin-top:10px;display:none">Done — it's in your downloads.</div>
+    </div>
+
+    <div class="section-label">KEEPING IT SAFE</div>
+    <div class="card-soft" id="vault-backup"></div>
+
+    <div class="section-label">EVERYTHING SO FAR</div>
+    <div id="vault-list"></div>
   </div>
 
   <!-- ── Nav ──────────────────────────────────────────────────── -->
@@ -1305,6 +1338,7 @@ let S = {
   aiReflect: false,  // "A thought back" — off unless the user turns it on
   backupCode: '',    // recovery code; deriving key + id happens on demand
   backupLast: 0,
+  vaultOn: false,    // leaving-care vault (18+) — stays false until they opt in
 };
 
 // Demo data — loads ONLY with ?demo=1 in the URL. Real users start clean.
@@ -1531,6 +1565,7 @@ function showView(name) {
   if (name === 'milestones') renderMilestones();
   if (name === 'letter')     renderLetterView();
   if (name === 'journey')    renderJourney();
+  if (name === 'vault')      renderVault();
 }
 
 // ─── Home ─────────────────────────────────────────────────────
@@ -1572,6 +1607,7 @@ function renderHome() {
       </div>
     `;
   }
+  renderVaultCards();
 }
 
 // ─── Share my week ────────────────────────────────────────────
@@ -1691,6 +1727,7 @@ function renderMe() {
   document.getElementById('self-note-text').value = S.selfNote || '';
   updateReflectToggle();
   renderBackupCard();
+  renderVaultCards();
 }
 
 function toggleValue(v) {
@@ -2078,6 +2115,7 @@ async function copyBackupCode() {
 function confirmCodeSaved() {
   document.getElementById('code-overlay').classList.remove('open');
   renderBackupCard();
+  if (document.getElementById('view-vault').classList.contains('active')) renderVault();
   doBackup(true);
 }
 
@@ -2496,15 +2534,20 @@ function setJourneyFilter(f) {
   renderJourney();
 }
 
-function renderJourney() {
-  renderPatterns();
+// Everything recorded, newest first. Shared by Journey and the Vault.
+function collectTimeline() {
   const all = [];
   S.moods.forEach(m => all.push({type:'mood', d:m.d, data:m, ts:m.ts||0}));
   S.journals.forEach(j => all.push({type:'journal', d:j.d, data:j, ts:j.ts||0}));
   S.milestones.forEach(m => all.push({type:'milestone', d:m.d, data:m, ts:m.ts||0}));
   (S.letters||[]).forEach(l => all.push({type:'letter', d:l.writtenAt, data:l, ts:l.ts||0}));
-
   all.sort((a,b) => b.ts - a.ts);
+  return all;
+}
+
+function renderJourney() {
+  renderPatterns();
+  const all = collectTimeline();
 
   const filtered = S.journeyFilter === 'all' ? all : all.filter(i => i.type === S.journeyFilter);
   const list = document.getElementById('journey-list');
@@ -2514,7 +2557,12 @@ function renderJourney() {
     return;
   }
 
-  list.innerHTML = filtered.map((item, i) => {
+  list.innerHTML = timelineHTML(filtered);
+  hydrateMedia(list);
+}
+
+function timelineHTML(filtered) {
+  return filtered.map((item, i) => {
     const dotColor = item.type === 'mood' ? MOOD_COLORS[item.data.v] : item.type === 'milestone' ? '#1A7A6E' : item.type === 'letter' ? '#1D6FA4' : '#888780';
     const typeLabel = {mood:'Check-in', journal:'Journal', milestone:'Milestone', letter:'Future Letter'}[item.type];
     let body = '';
@@ -2560,7 +2608,185 @@ function renderJourney() {
       </div>
     `;
   }).join('');
+}
+
+// ─── Vault — leaving-care archive (18+) ───────────────────────
+// The record THEY kept, not a council file about them. Read-and-
+// export only; the story document is generated entirely on-device.
+function vaultEligible() { return S.age === '17-18' || S.age === '19-21'; }
+
+function renderVaultCards() {
+  let html = '';
+  if (vaultEligible()) {
+    if (S.vaultOn) {
+      html = `
+        <div class="section-label">MY VAULT</div>
+        <div class="card-soft" style="cursor:pointer" onclick="showView('vault')">
+          <div style="font-size:14px;color:var(--text);font-weight:600">My Vault</div>
+          <div style="font-size:13px;color:var(--text2);margin-top:4px;line-height:1.5">Your whole story, in one place.</div>
+          <div style="font-size:13px;color:var(--tr);margin-top:8px">Open it &rarr;</div>
+        </div>`;
+    } else {
+      const btn = S.age === '17-18' ? "I'm 18 — open my Vault" : 'Open my Vault';
+      html = `
+        <div class="section-label">MY VAULT</div>
+        <div class="card-soft">
+          <div style="font-size:14px;color:var(--text);font-weight:600">Your Vault is ready</div>
+          <div style="font-size:13px;color:var(--text2);margin-top:4px;line-height:1.5">
+            You've been keeping True for a while. Your whole story is here — and it's yours to take anywhere.
+          </div>
+          <button class="btn-primary btn-sm" style="margin-top:10px" onclick="openVault()">${btn}</button>
+        </div>`;
+    }
+  }
+  const home = document.getElementById('home-vault');
+  const me = document.getElementById('me-vault');
+  if (home) home.innerHTML = html;
+  if (me) me.innerHTML = html;
+}
+
+function openVault() {
+  if (!vaultEligible()) return;
+  if (!S.vaultOn) { S.vaultOn = true; saveState(); }
+  showView('vault');
+}
+
+function renderVault() {
+  const all = collectTimeline();
+  const fmtDay = ts => new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  // Story header
+  const stats = document.getElementById('vault-stats');
+  if (!all.length) {
+    stats.innerHTML = '<div style="font-size:14px;color:var(--text2);line-height:1.6">Nothing recorded yet — everything you add builds your story here.</div>';
+  } else {
+    const earliest = all.reduce((m, i) => (i.ts && i.ts < m ? i.ts : m), Date.now());
+    const counts = [
+      [S.moods.length, 'check-in', 'check-ins'], [S.journals.length, 'journal entry', 'journal entries'],
+      [S.milestones.length, 'milestone', 'milestones'], [(S.letters||[]).length, 'letter', 'letters'],
+    ].filter(([n]) => n > 0).map(([n, one, many]) => `<b>${n}</b> ${n === 1 ? one : many}`).join(' &middot; ');
+    stats.innerHTML = `
+      <div style="font-size:15px;color:var(--text);line-height:1.6">Keeping True since <b>${fmtDay(earliest)}</b>.</div>
+      <div style="font-size:13px;color:var(--text2);margin-top:6px;line-height:1.6">${counts}</div>`;
+  }
+
+  // Backup status
+  const b = document.getElementById('vault-backup');
+  if (S.backupCode) {
+    b.innerHTML = `
+      <div style="font-size:14px;color:var(--text)">Backup is on.</div>
+      <div style="font-size:13px;color:var(--text3);margin-top:4px">${S.backupLast
+        ? 'Last backed up ' + new Date(S.backupLast).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+        : 'First backup pending.'}</div>`;
+  } else {
+    b.innerHTML = `
+      <div style="font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:12px">
+        Phones get lost and broken. Backup keeps a scrambled copy only your code can unlock — so your story outlives any device.
+      </div>
+      <button class="btn-primary" onclick="enableBackup()">Turn on backup</button>`;
+  }
+
+  // The complete record
+  const list = document.getElementById('vault-list');
+  list.innerHTML = all.length
+    ? timelineHTML(all)
+    : '<div style="font-size:14px;color:var(--text3);padding:12px 0">Nothing here yet.</div>';
   hydrateMedia(list);
+}
+
+// "Download my story" — a single self-contained HTML file, readable
+// anywhere without the app, media embedded, locked letters kept sealed.
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function exportStory() {
+  const mediaMap = {};
+  try {
+    const recs = await mediaAll();
+    await Promise.all(recs.map(rec => new Promise(resolve => {
+      const fr = new FileReader();
+      fr.onload = () => { mediaMap[rec.id] = fr.result; resolve(); };
+      fr.onerror = () => resolve();
+      fr.readAsDataURL(rec.blob);
+    })));
+  } catch (e) { /* story still exports, just without media */ }
+
+  const fmtDay = ts => ts ? new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+  const items = collectTimeline().reverse(); // oldest first — a story reads forward
+
+  const entries = items.map(item => {
+    const when = item.ts ? fmtDay(item.ts) : esc(item.d);
+    let inner = '';
+    if (item.type === 'mood') {
+      inner = `<div class="k">Check-in</div><div class="mood"><span class="dot" style="background:${MOOD_COLORS[item.data.v]}"></span>${esc(item.data.l)}</div>` +
+              (item.data.n ? `<p>${esc(item.data.n)}</p>` : '');
+    } else if (item.type === 'journal') {
+      inner = `<div class="k">Journal</div><div class="q">${esc(item.data.p)}</div><p>${esc(item.data.t)}</p>`;
+    } else if (item.type === 'milestone') {
+      inner = `<div class="k">Milestone &middot; ${esc(item.data.c)}</div><p><b>${esc(item.data.t)}</b></p>` +
+              (item.data.photoId && mediaMap[item.data.photoId] ? `<img src="${mediaMap[item.data.photoId]}" alt="Photo memory">` : '') +
+              (item.data.audioId && mediaMap[item.data.audioId] ? `<audio controls src="${mediaMap[item.data.audioId]}"></audio>` : '');
+    } else {
+      const l = item.data;
+      inner = `<div class="k">Letter to me at ${esc(l.openAt)}</div>` + (l.status === 'locked'
+        ? `<details><summary>Sealed until ${esc(l.openYear)} — open it only when you're ready.</summary><p>${esc(l.body)}</p></details>`
+        : `<p>${esc(l.body)}</p>`);
+    }
+    return `<article><div class="w">${when}</div>${inner}</article>`;
+  }).join('\n');
+
+  const about = [
+    S.selectedValues.length ? `<p><b>What matters to me:</b> ${S.selectedValues.map(esc).join(', ')}</p>` : '',
+    S.goals.length ? `<p><b>My goals:</b> ${S.goals.map(esc).join(' &middot; ')}</p>` : '',
+    S.selfNote ? `<p><b>One thing I know about myself:</b> ${esc(S.selfNote)}</p>` : '',
+  ].filter(Boolean).join('\n');
+
+  const today = new Date().toISOString().slice(0, 10);
+  const doc = `<!DOCTYPE html>
+<html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>My Story${S.name ? ' — ' + esc(S.name) : ''}</title>
+<style>
+  body{font-family:Georgia,'Times New Roman',serif;max-width:640px;margin:0 auto;padding:40px 24px;color:#1a1a18;background:#FDFCF9;line-height:1.65}
+  h1{font-size:34px;margin:0;color:#0F5349}
+  .tag{color:#1A7A6E;font-style:italic;margin:6px 0 4px}
+  .meta{font-size:14px;color:#888780;margin-bottom:36px}
+  .about{background:#E6F5F4;border-radius:12px;padding:18px 22px;margin-bottom:36px}
+  .about p{margin:6px 0;font-size:15px}
+  article{border-left:3px solid #E6F5F4;padding:2px 0 2px 20px;margin-bottom:28px}
+  .w{font-size:13px;color:#888780;margin-bottom:2px}
+  .k{font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#1A7A6E;font-weight:700;margin-bottom:4px}
+  .q{font-style:italic;color:#555;font-size:14px;margin-bottom:2px}
+  .mood{font-weight:600;font-size:16px}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px}
+  p{margin:6px 0;font-size:16px;white-space:pre-wrap}
+  img{max-width:100%;border-radius:10px;margin-top:8px}
+  audio{width:100%;margin-top:8px}
+  details{margin-top:4px}
+  summary{cursor:pointer;color:#1D6FA4;font-size:15px}
+  footer{margin-top:48px;font-size:13px;color:#888780;border-top:1px solid #eee;padding-top:16px}
+  @media print{body{background:#fff}article{break-inside:avoid}}
+</style></head><body>
+<h1>My Story</h1>
+<div class="tag">Your words. Your truth.</div>
+<div class="meta">${S.name ? 'Kept by ' + esc(S.name) + ' &middot; ' : ''}saved from my True app on ${fmtDay(Date.now())}</div>
+${about ? '<div class="about">' + about + '</div>' : ''}
+${entries || '<p>Nothing recorded yet.</p>'}
+<footer>Written by me, on my own device. Nobody else has ever had access to this — that's the point of True.</footer>
+</body></html>`;
+
+  const blob = new Blob([doc], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'true-my-story-' + today + '.html';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  const msg = document.getElementById('vault-export-msg');
+  msg.style.display = 'block';
+  setTimeout(() => { msg.style.display = 'none'; }, 3000);
 }
 
 // ─── Init ─────────────────────────────────────────────────────
