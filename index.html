@@ -879,7 +879,11 @@
       </div>
       <div id="ai-dl-error" style="display:none">
         <div style="font-size:14px;color:var(--text2);line-height:1.6;margin:8px 0 14px" id="ai-dl-error-text"></div>
-        <button class="btn-secondary" style="width:100%" onclick="closeAIOverlay()">Close</button>
+        <button class="btn-primary" style="width:100%;margin-bottom:8px" onclick="retryLocalAIDownload(false)">Try again</button>
+        <button class="btn-secondary" style="width:100%" onclick="closeAIOverlay()">Not now</button>
+        <div style="text-align:center;margin-top:12px">
+          <button class="link-quiet" onclick="retryLocalAIDownload(true)">Still stuck? Start the download over</button>
+        </div>
       </div>
     </div>
   </div>
@@ -2057,14 +2061,32 @@ async function localAISupported() {
   try { return !!(await navigator.gpu.requestAdapter()); } catch (e) { return false; }
 }
 
+async function loadWebllm() {
+  _webllm = _webllm || await import(WEBLLM_URL);
+  return _webllm;
+}
+
 function localAIEngine(onProgress) {
   if (_enginePromise) return _enginePromise;
   _enginePromise = (async () => {
-    _webllm = _webllm || await import(WEBLLM_URL);
-    return _webllm.CreateMLCEngine(LOCAL_AI_MODEL, { initProgressCallback: onProgress || (() => {}) });
+    const m = await loadWebllm();
+    return m.CreateMLCEngine(LOCAL_AI_MODEL, { initProgressCallback: onProgress || (() => {}) });
   })();
   _enginePromise.catch(() => { _enginePromise = null; });
   return _enginePromise;
+}
+
+// A load that stalled is still "pending" forever — fetch has no timeout of
+// its own. Dropping the handle means the next attempt starts clean instead
+// of being handed back the dead one.
+function resetLocalAIEngine() { _enginePromise = null; }
+
+async function clearLocalAIModel() {
+  try {
+    const m = await loadWebllm();
+    await m.deleteModelAllInfoInCache(LOCAL_AI_MODEL);
+  } catch (e) {}
+  resetLocalAIEngine();
 }
 
 async function renderReflectCard() {
@@ -2144,45 +2166,80 @@ async function openAIOverlay() {
 
 function closeAIOverlay() { document.getElementById('ai-overlay').classList.remove('open'); }
 
+// If the connection dies mid-download, fetch just waits — forever. Without
+// this watchdog the screen sits on "Getting ready…" looking like progress
+// when nothing is happening.
+const AI_STALL_MS = 60000;
+
+function aiDownloadFailed(msg) {
+  document.getElementById('ai-dl-progress').style.display = 'none';
+  document.getElementById('ai-dl-error').style.display = 'block';
+  document.getElementById('ai-dl-error-text').textContent = msg;
+}
+
 async function startLocalAIDownload() {
   document.getElementById('ai-dl-intro').style.display = 'none';
+  document.getElementById('ai-dl-error').style.display = 'none';
   document.getElementById('ai-dl-progress').style.display = 'block';
   const status = document.getElementById('ai-dl-status');
+  status.textContent = 'Getting ready…';
   try { await navigator.storage?.persist?.(); } catch (e) {}
+
+  let settled = false;
+  let lastTick = Date.now();
+  const watchdog = setInterval(() => {
+    if (settled || Date.now() - lastTick < AI_STALL_MS) return;
+    settled = true;
+    clearInterval(watchdog);
+    resetLocalAIEngine();
+    aiDownloadFailed('The download stopped — your connection probably dropped. Nothing is broken. Try again on Wi-Fi and it\'ll pick up where it left off.');
+  }, 4000);
+
   try {
     const engine = await localAIEngine(p => {
-      const pct = p && typeof p.progress === 'number' ? Math.round(p.progress * 100) : null;
-      status.textContent = pct !== null && pct > 0 ? `Downloading — ${pct}%` : 'Getting ready…';
+      lastTick = Date.now();
+      const pct = p && typeof p.progress === 'number' ? Math.round(p.progress * 100) : 0;
+      status.textContent = pct > 0 ? `Downloading — ${pct}%` : 'Getting ready…';
     });
+    if (settled) return;
     // Warm-up: the GPU compiles the AI's shaders on the very first run,
     // which can take minutes. Pay that cost here, behind the progress
     // screen, so the first real thought back doesn't hang.
-    status.textContent = 'Nearly there — setting up on your phone…';
+    lastTick = Date.now();
+    status.textContent = 'Nearly there — setting up on your phone. This bit can take a few minutes, and only happens once.';
+    clearInterval(watchdog);  // shader compilation reports nothing; don't call it a stall
     try { await engine.chat.completions.create({ messages: [{ role: 'user', content: 'Hi' }], max_tokens: 4 }); } catch (e) {}
+    if (settled) return;
+    settled = true;
     S.aiReflect = true;
     saveState();
     document.getElementById('ai-dl-progress').style.display = 'none';
     document.getElementById('ai-dl-done').style.display = 'block';
     renderReflectCard();
   } catch (e) {
-    document.getElementById('ai-dl-progress').style.display = 'none';
-    document.getElementById('ai-dl-error').style.display = 'block';
-    document.getElementById('ai-dl-error-text').textContent =
-      'That didn\'t work — maybe the connection dropped, or your phone ran out of room. Nothing\'s broken; you can try again any time.';
+    if (settled) return;
+    settled = true;
+    clearInterval(watchdog);
+    resetLocalAIEngine();
+    aiDownloadFailed('That didn\'t work — maybe the connection dropped, or your phone ran out of room. Nothing\'s broken; you can try again any time.');
   }
+}
+
+// Retry from scratch: bin whatever half-downloaded before starting, so a
+// broken part-file can't wedge every future attempt.
+async function retryLocalAIDownload(fresh) {
+  document.getElementById('ai-dl-error').style.display = 'none';
+  document.getElementById('ai-dl-progress').style.display = 'block';
+  document.getElementById('ai-dl-status').textContent = fresh ? 'Clearing the last attempt…' : 'Getting ready…';
+  if (fresh) await clearLocalAIModel(); else resetLocalAIEngine();
+  startLocalAIDownload();
 }
 
 async function disableLocalAI(removeModel) {
   if (removeModel && !confirm('Remove the AI from your phone? Turning it back on later means downloading it again.')) return;
   S.aiReflect = false;
   saveState();
-  if (removeModel) {
-    try {
-      _webllm = _webllm || await import(WEBLLM_URL);
-      await _webllm.deleteModelAllInfoInCache(LOCAL_AI_MODEL);
-    } catch (e) {}
-    _enginePromise = null;
-  }
+  if (removeModel) await clearLocalAIModel();
   renderReflectCard();
 }
 
