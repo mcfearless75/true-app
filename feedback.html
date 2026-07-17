@@ -164,11 +164,44 @@ function tag(id, el) {
 }
 
 // ─── Where feedback goes ──────────────────────────────────────
-// Paste the Formspree form id here (the bit after /f/ — e.g. 'xayzbwqd').
-// Until it's set, submissions are kept on this device only and nothing
-// is sent anywhere. This form is about the APP, never about the person:
-// no names, no journal content, nothing from anyone's account.
-const FORMSPREE_ID = '';
+// Formspree form id (the bit after /f/). If it's ever blank, submissions
+// stay on the device and nothing is sent anywhere. This form is about the
+// APP, never about the person: no names, no journal content, nothing from
+// anyone's account.
+const FORMSPREE_ID = 'xpqvprkq';
+const QUEUE_KEY = 'true_feedback_queue';
+
+function readQueue() {
+  try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); } catch (e) { return []; }
+}
+
+async function postFeedback(payload) {
+  if (!FORMSPREE_ID) return false;
+  try {
+    const r = await fetch('https://formspree.io/f/' + FORMSPREE_ID, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return r.ok;
+  } catch (e) { return false; }
+}
+
+// Anything that failed to send (no signal on the bus, etc.) is retried the
+// next time this page opens. Without this the queue would be a quiet hole
+// that swallows feedback nobody ever reads.
+async function flushQueue() {
+  const q = readQueue();
+  if (!q.length) return;
+  const left = [];
+  for (const item of q) {
+    if (!(await postFeedback(item))) left.push(item);
+  }
+  try {
+    if (left.length) localStorage.setItem(QUEUE_KEY, JSON.stringify(left));
+    else localStorage.removeItem(QUEUE_KEY);
+  } catch (e) {}
+}
 
 async function submitFeedback() {
   F['age']     = document.getElementById('q-age').value;
@@ -180,32 +213,22 @@ async function submitFeedback() {
   const btn = document.getElementById('submit-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
 
-  let sent = false;
-  if (FORMSPREE_ID) {
-    try {
-      const r = await fetch('https://formspree.io/f/' + FORMSPREE_ID, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify(F),
-      });
-      sent = r.ok;
-    } catch (e) { sent = false; }
-  }
+  const payload = { ...F, at: new Date().toISOString() };
+  const sent = await postFeedback(payload);
 
-  // Never lose someone's answers to a dropped connection — keep a local
-  // copy either way so nothing they typed is wasted.
+  // Never lose someone's answers to a dropped connection — hold them here
+  // and try again next time the page opens.
   if (!sent) {
-    try {
-      const q = JSON.parse(localStorage.getItem('true_feedback_queue') || '[]');
-      q.push({ ...F, at: new Date().toISOString() });
-      localStorage.setItem('true_feedback_queue', JSON.stringify(q));
-    } catch (e) {}
+    try { localStorage.setItem(QUEUE_KEY, JSON.stringify([...readQueue(), payload])); } catch (e) {}
   }
 
   document.getElementById('form-view').style.display = 'none';
   document.getElementById('success-view').style.display = 'block';
   window.scrollTo(0, 0);
 }
+
+// Retry anything stuck from a previous visit, quietly.
+flushQueue();
 </script>
 </body>
 </html>
