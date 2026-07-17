@@ -838,6 +838,40 @@
     </div>
   </div>
 
+  <!-- ON-DEVICE AI — one-off model download, then it never touches the internet -->
+  <div class="overlay" id="ai-overlay">
+    <div class="overlay-card">
+      <div class="page-title" style="font-size:20px">A thought back, fully on your phone</div>
+      <div id="ai-dl-intro">
+        <div style="font-size:14px;color:var(--text2);line-height:1.6;margin:8px 0 14px">
+          After you journal, True can write a short thought back. The tiny AI that writes it
+          downloads <strong>once</strong> (about 700MB — Wi-Fi is best), then lives on your phone.
+          It works with the internet off. Your words never leave this device — there is nowhere for them to go.
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-primary" style="flex:1" onclick="startLocalAIDownload()">Download &amp; turn on</button>
+          <button class="btn-secondary" style="flex:1" onclick="closeAIOverlay()">Not now</button>
+        </div>
+      </div>
+      <div id="ai-dl-progress" style="display:none">
+        <div style="font-size:14px;color:var(--text2);line-height:1.6;margin:8px 0 14px">
+          Getting the AI onto your phone. You can keep using True — just leave this page open.
+        </div>
+        <div class="card-soft" style="text-align:center;font-size:14px;color:var(--trdark)" id="ai-dl-status">Starting…</div>
+      </div>
+      <div id="ai-dl-done" style="display:none">
+        <div style="font-size:14px;color:var(--text);line-height:1.6;margin:8px 0 14px">
+          Done. From now on, a thought back is written right here on your phone — nothing you journal ever leaves it.
+        </div>
+        <button class="btn-primary" style="width:100%" onclick="closeAIOverlay()">Nice</button>
+      </div>
+      <div id="ai-dl-error" style="display:none">
+        <div style="font-size:14px;color:var(--text2);line-height:1.6;margin:8px 0 14px" id="ai-dl-error-text"></div>
+        <button class="btn-secondary" style="width:100%" onclick="closeAIOverlay()">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- RESTORE — new device, recovery code in, story back -->
   <div class="overlay" id="restore-overlay" onclick="if(event.target===this)closeRestore()">
     <div class="overlay-card">
@@ -1012,14 +1046,7 @@
     </div>
 
     <div class="section-label">A THOUGHT BACK (OPTIONAL)</div>
-    <div class="card-soft">
-      <div style="font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:12px">
-        When you save a journal entry, True can offer a short thought back on what you wrote.
-        Your entry is used once to write the reply, then it's gone — never stored anywhere, never seen by anyone.
-        This is off unless you turn it on.
-      </div>
-      <button class="btn-secondary" id="reflect-toggle" onclick="toggleReflect()">Turn on</button>
-    </div>
+    <div class="card-soft" id="reflect-card"></div>
 
     <div id="me-vault"></div>
 
@@ -1725,7 +1752,7 @@ function renderMe() {
   `).join('');
   renderGoals();
   document.getElementById('self-note-text').value = S.selfNote || '';
-  updateReflectToggle();
+  renderReflectCard();
   renderBackupCard();
   renderVaultCards();
 }
@@ -1940,39 +1967,161 @@ function closeCalm() {
   document.getElementById('calm-overlay').classList.remove('open');
 }
 
-// ─── A thought back — optional AI reflection ──────────────────
-// Opt-in only. The entry is sent once to a serverless function that
-// writes a short reply and stores nothing. Any failure = silent skip.
-function toggleReflect() {
-  S.aiReflect = !S.aiReflect;
-  saveState();
-  updateReflectToggle();
+// ─── A thought back — on-device AI reflection ─────────────────
+// Opt-in only. The AI (WebLLM) downloads once and then lives on the
+// phone: no server, no key, works offline. Entries structurally
+// cannot leave the device. Any failure = silent skip, as before.
+const LOCAL_AI_MODEL = localStorage.getItem('true_ai_model') || 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
+const WEBLLM_URL = 'https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.79/+esm';
+
+let _webllm = null, _enginePromise = null;
+
+async function localAISupported() {
+  if (!('gpu' in navigator)) return false;
+  try { return !!(await navigator.gpu.requestAdapter()); } catch (e) { return false; }
 }
 
-function updateReflectToggle() {
-  const btn = document.getElementById('reflect-toggle');
-  btn.textContent = S.aiReflect ? 'Turn off' : 'Turn on';
-  btn.style.color = S.aiReflect ? 'var(--tr)' : '';
+function localAIEngine(onProgress) {
+  if (_enginePromise) return _enginePromise;
+  _enginePromise = (async () => {
+    _webllm = _webllm || await import(WEBLLM_URL);
+    return _webllm.CreateMLCEngine(LOCAL_AI_MODEL, { initProgressCallback: onProgress || (() => {}) });
+  })();
+  _enginePromise.catch(() => { _enginePromise = null; });
+  return _enginePromise;
+}
+
+async function renderReflectCard() {
+  const card = document.getElementById('reflect-card');
+  if (!card) return;
+  const supported = await localAISupported();
+  if (!supported) {
+    card.innerHTML = `
+      <div style="font-size:14px;color:var(--text2);line-height:1.6">
+        After you journal, True can write a short thought back — using a tiny AI that lives
+        entirely on your phone, so your words never leave it.
+        This phone can't run that privately yet, so True doesn't offer it here.
+        No shortcut is taken: if it can't happen on your phone, it doesn't happen.
+      </div>`;
+    return;
+  }
+  if (S.aiReflect) {
+    card.innerHTML = `
+      <div style="font-size:14px;color:var(--text);margin-bottom:4px">On.</div>
+      <div style="font-size:13px;color:var(--text3);line-height:1.6;margin-bottom:12px">
+        The AI lives on this phone and never connects to the internet. Thoughts back are written right here.
+      </div>
+      <button class="btn-secondary" onclick="disableLocalAI(false)">Turn off</button>
+      <div style="margin-top:10px">
+        <button class="link-quiet" onclick="disableLocalAI(true)">Remove the AI from my phone (frees space)</button>
+      </div>`;
+  } else {
+    card.innerHTML = `
+      <div style="font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:12px">
+        When you save a journal entry, True can offer a short thought back on what you wrote —
+        written by a tiny AI that lives on your phone. It downloads once, then works with the
+        internet off. Nothing you write ever leaves this device. Off unless you turn it on.
+      </div>
+      <button class="btn-secondary" onclick="openAIOverlay()">Turn on</button>`;
+  }
+}
+
+function openAIOverlay() {
+  ['ai-dl-progress', 'ai-dl-done', 'ai-dl-error'].forEach(id => document.getElementById(id).style.display = 'none');
+  document.getElementById('ai-dl-intro').style.display = 'block';
+  document.getElementById('ai-overlay').classList.add('open');
+}
+
+function closeAIOverlay() { document.getElementById('ai-overlay').classList.remove('open'); }
+
+async function startLocalAIDownload() {
+  document.getElementById('ai-dl-intro').style.display = 'none';
+  document.getElementById('ai-dl-progress').style.display = 'block';
+  const status = document.getElementById('ai-dl-status');
+  try { await navigator.storage?.persist?.(); } catch (e) {}
+  try {
+    const engine = await localAIEngine(p => {
+      const pct = p && typeof p.progress === 'number' ? Math.round(p.progress * 100) : null;
+      status.textContent = pct !== null && pct > 0 ? `Downloading — ${pct}%` : 'Getting ready…';
+    });
+    // Warm-up: the GPU compiles the AI's shaders on the very first run,
+    // which can take minutes. Pay that cost here, behind the progress
+    // screen, so the first real thought back doesn't hang.
+    status.textContent = 'Nearly there — setting up on your phone…';
+    try { await engine.chat.completions.create({ messages: [{ role: 'user', content: 'Hi' }], max_tokens: 4 }); } catch (e) {}
+    S.aiReflect = true;
+    saveState();
+    document.getElementById('ai-dl-progress').style.display = 'none';
+    document.getElementById('ai-dl-done').style.display = 'block';
+    renderReflectCard();
+  } catch (e) {
+    document.getElementById('ai-dl-progress').style.display = 'none';
+    document.getElementById('ai-dl-error').style.display = 'block';
+    document.getElementById('ai-dl-error-text').textContent =
+      'That didn\'t work — maybe the connection dropped, or your phone ran out of room. Nothing\'s broken; you can try again any time.';
+  }
+}
+
+async function disableLocalAI(removeModel) {
+  if (removeModel && !confirm('Remove the AI from your phone? Turning it back on later means downloading it again.')) return;
+  S.aiReflect = false;
+  saveState();
+  if (removeModel) {
+    try {
+      _webllm = _webllm || await import(WEBLLM_URL);
+      await _webllm.deleteModelAllInfoInCache(LOCAL_AI_MODEL);
+    } catch (e) {}
+    _enginePromise = null;
+  }
+  renderReflectCard();
+}
+
+// Crisis gate: a small model must not improvise here. The check runs
+// on this device only; on a match we skip the AI and point to real people.
+const CRISIS_PATTERNS = /suicid|kill (myself|me)|end (my|it) (life|all)|self.?harm|hurt(ing)? myself|cut(ting)? myself|don'?t want to (be here|live|wake up)|better off dead|overdos/i;
+
+function localAISystemPrompt(ageBand) {
+  const simpler = ageBand === '10-13' ? ' Use simple, short sentences a 12-year-old reads easily.' : '';
+  return 'You are the quiet, kind voice inside True, a completely private journal app for young people in the UK. ' +
+    'Someone aged ' + (ageBand || '14-16') + ' just wrote the journal entry below. ' +
+    'Reply with 2 or 3 short, warm sentences in UK English. Speak like a wise friend, never a therapist. ' +
+    'Reflect back what they said and notice one strength or something true about them. One gentle question is fine. ' +
+    'Never give advice, never diagnose, never tell them to talk to an adult, never mention being an AI. ' +
+    'Plain sentences only, no lists, no headings.' + simpler;
 }
 
 async function requestReflection(entry, promptUsed) {
   const el = document.getElementById('journal-reflection');
   try {
+    if (CRISIS_PATTERNS.test(entry)) {
+      el.style.display = 'block';
+      el.innerHTML = `
+        <div class="section-label" style="margin-top:0">FROM TRUE</div>
+        <div style="font-size:14px;color:var(--text);line-height:1.65">
+          That sounds really heavy. A thought back from an app isn't enough for this — real people are better.
+        </div>
+        <button class="link-quiet" style="margin-top:10px;color:var(--tr)" onclick="openHelp()">Someone to talk to right now &rarr;</button>`;
+      return;
+    }
     el.style.display = 'block';
-    el.innerHTML = '<div style="font-size:13px;color:var(--text3)">A thought back is on its way&hellip;</div>';
-    const r = await fetch('/.netlify/functions/reflect', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ entry, prompt: promptUsed, ageBand: S.age }),
+    el.innerHTML = '<div style="font-size:13px;color:var(--text3)">True is thinking &mdash; right here on your phone&hellip;</div>';
+    const engine = await localAIEngine();
+    const res = await engine.chat.completions.create({
+      messages: [
+        { role: 'system', content: localAISystemPrompt(S.age) },
+        { role: 'user', content: `The prompt they were writing to: "${promptUsed}"\n\nTheir entry:\n${entry.slice(0, 4000)}` },
+      ],
+      temperature: 0.7,
+      max_tokens: 110,
     });
-    if (!r.ok) throw new Error('unavailable');
-    const data = await r.json();
-    if (!data.reflection) throw new Error('empty');
-    const safe = data.reflection.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    let text = (res.choices?.[0]?.message?.content || '').replace(/[*_#>`]/g, '').trim();
+    const sentences = text.match(/[^.!?]+[.!?]+/g);
+    if (sentences) text = sentences.slice(0, 4).join('').trim();
+    if (!text || text.length < 15) throw new Error('empty');
     el.innerHTML = `
       <div class="section-label" style="margin-top:0">A THOUGHT BACK</div>
-      <div style="font-size:14px;color:var(--text);line-height:1.65">${safe}</div>
-      <div style="font-size:12px;color:var(--text3);margin-top:10px">Written just now, then forgotten. Your entry lives only on this device.</div>`;
+      <div style="font-size:14px;color:var(--text);line-height:1.65">${esc(text)}</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:10px">Written just now by a tiny AI that lives on this phone. Nothing left your device.</div>`;
   } catch (e) {
     el.style.display = 'none';
   }

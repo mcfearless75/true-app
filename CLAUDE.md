@@ -53,7 +53,7 @@ See REIGNITE.md for full detail and next steps.
 1. Age-adaptive UI (under 14 vs 16+) — currentAge() helper exists
 2. Hash the PIN (Web Crypto SHA-256)
 3. Data export (JSON download — GDPR + care leaver continuity)
-4. AI journalling via Anthropic API (serverless proxy, zero server-side storage)
+4. ~~AI journalling~~ DONE July 2026 — fully on-device via WebLLM (Llama 3.2 1B, WebGPU). No server, no API key; reflect.mjs deleted. Entries structurally cannot leave the device.
 5. Formspree on feedback.html
 6. Capacitor.js for iOS/Android (only after beta validation)
 
