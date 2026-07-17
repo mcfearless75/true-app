@@ -761,6 +761,13 @@
     </div>
   </div>
 
+  <!-- Storage full. Shown only when a save genuinely didn't land — the one
+       thing this app must never hide, because the words are the product. -->
+  <div id="save-warn" style="display:none;position:fixed;top:0;left:0;right:0;z-index:60;background:var(--warn);color:#fff;padding:12px 16px;font-size:13.5px;line-height:1.5;box-shadow:0 2px 12px rgba(0,0,0,0.2)">
+    <strong>That didn't save.</strong> Your phone has run out of room, so True can't keep what you just wrote.
+    Your words are still on the screen — copy them somewhere safe, then free up some space and try again.
+  </div>
+
   <!-- ── Header ───────────────────────────────────────────────── -->
   <div id="header">
     <div class="true-logo">
@@ -1434,10 +1441,23 @@ const DEMO_DATA = {
 // ─── localStorage persistence ─────────────────────────────────
 let backupDirty = false;
 
+// Returns false if the write didn't land. NEVER swallow this: a save that
+// silently fails loses someone's words while telling them it worked, which
+// is the worst thing this app could do.
 function saveState() {
-  try { localStorage.setItem('true_state', JSON.stringify(S)); } catch(e) {}
-  backupDirty = true;
+  try {
+    localStorage.setItem('true_state', JSON.stringify(S));
+    backupDirty = true;
+    hideSaveWarning();
+    return true;
+  } catch (e) {
+    showSaveWarning();
+    return false;
+  }
 }
+
+function showSaveWarning() { document.getElementById('save-warn').style.display = 'block'; }
+function hideSaveWarning() { const el = document.getElementById('save-warn'); if (el) el.style.display = 'none'; }
 
 function loadState() {
   try {
@@ -1773,8 +1793,10 @@ function saveJournal() {
   const d = now.toLocaleDateString('en-GB', {day:'numeric', month:'short'});
   const promptUsed = currentPrompt();
   S.journals.push({d, p: promptUsed, t, ts: Date.now()});
+  // If it didn't reach the disk, don't pretend. Take it back out and leave
+  // their words in the box so nothing they wrote is lost.
+  if (!saveState()) { S.journals.pop(); return; }
   document.getElementById('journal-text').value = '';
-  saveState();
   renderJournal();
 }
 
@@ -2487,11 +2509,13 @@ function saveLetter() {
     openYear: now.getFullYear() + years,
     body, status: 'locked', ts: Date.now()
   });
+  // Same rule as the journal: if it didn't reach the disk, don't clear the
+  // page and don't claim it's sealed.
+  if (!saveState()) { S.letters.pop(); return; }
   document.getElementById('letter-body').value = '';
   letterSelectedAge = null;
   document.getElementById('letter-opening').textContent = 'Dear future me,';
   document.getElementById('letter-unlock-preview').textContent = 'Choose an age above to set when this unlocks.';
-  saveState();
   letterTab('letters');
 }
 
