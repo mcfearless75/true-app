@@ -1058,6 +1058,7 @@
       <div id="backup-on" style="display:none">
         <div style="font-size:14px;color:var(--text);margin-bottom:4px">Backup is on.</div>
         <div style="font-size:13px;color:var(--text3);margin-bottom:12px" id="backup-status"></div>
+        <div style="display:none;font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:12px;padding-left:10px;border-left:2px solid var(--warn)" id="backup-skipped"></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn-secondary" onclick="doBackup(true)">Back up now</button>
           <button class="btn-secondary" onclick="showBackupCode()">Show my code</button>
@@ -2075,18 +2076,36 @@ async function deriveBackupMaterial(code) {
   return { id, key };
 }
 
+// The server caps ciphertext at 6,000,000 chars (~4.5MB). Photos are the only
+// thing big enough to threaten that: two phone snaps blow past it. Words are
+// irreplaceable and tiny, so they ALWAYS go — media only fills the space left.
+// Anything that doesn't fit is named, never silently dropped.
+const BACKUP_MAX_PAYLOAD = 4200000;   // headroom under the server's ~4.5MB
+let backupSkipped = [];               // media left behind on the last build
+
 async function buildBackupPayload() {
   const state = { ...S };
   delete state.selectedMoodVal; delete state.selectedMoodLabel; delete state.selectedMsCat;
-  let media = [];
+  backupSkipped = [];
+
+  const base = JSON.stringify({ v: 1, state, media: [] }).length;
+  let budget = BACKUP_MAX_PAYLOAD - base;
+  const media = [];
   try {
     const all = await mediaAll();
-    media = (await Promise.all(all.map(rec => new Promise(res => {
-      const fr = new FileReader();
-      fr.onload = () => res({ id: rec.id, kind: rec.kind, type: rec.type, dataUrl: fr.result });
-      fr.onerror = () => res(null);
-      fr.readAsDataURL(rec.blob);
-    })))).filter(Boolean);
+    for (const rec of all) {
+      const item = await new Promise(res => {
+        const fr = new FileReader();
+        fr.onload = () => res({ id: rec.id, kind: rec.kind, type: rec.type, dataUrl: fr.result });
+        fr.onerror = () => res(null);
+        fr.readAsDataURL(rec.blob);
+      });
+      if (!item) continue;
+      const cost = JSON.stringify(item).length + 1;
+      if (cost > budget) { backupSkipped.push(item.kind === 'audio' ? 'voice note' : 'photo'); continue; }
+      budget -= cost;
+      media.push(item);
+    }
   } catch (e) {}
   return JSON.stringify({ v: 1, state, media });
 }
@@ -2130,6 +2149,7 @@ async function doBackup(manual) {
     });
     if (!r.ok) throw new Error('backup failed: ' + r.status);
     S.backupLast = Date.now();
+    S.backupSkipped = backupSkipped;   // what didn't fit, so the card can say so
     saveState();
     backupDirty = false;
     renderBackupCard();
@@ -2138,6 +2158,8 @@ async function doBackup(manual) {
   }
 }
 
+const BACKUP_STALE_MS = 3 * 86400000;
+
 function renderBackupCard() {
   const off = document.getElementById('backup-off');
   const on = document.getElementById('backup-on');
@@ -2145,10 +2167,29 @@ function renderBackupCard() {
   const enabled = !!S.backupCode;
   off.style.display = enabled ? 'none' : 'block';
   on.style.display = enabled ? 'block' : 'none';
-  if (enabled) {
-    document.getElementById('backup-status').textContent = S.backupLast
-      ? 'Last backed up ' + new Date(S.backupLast).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-      : 'First backup pending.';
+  if (!enabled) return;
+
+  const el = document.getElementById('backup-status');
+  if (!S.backupLast) { el.textContent = 'First backup pending.'; el.style.color = ''; return; }
+
+  const when = new Date(S.backupLast).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const stale = Date.now() - S.backupLast > BACKUP_STALE_MS;
+  // "Backup is on" plus a quietly ageing date is how someone loses everything
+  // while believing they're safe. If it hasn't worked in days, say so.
+  el.textContent = stale
+    ? "Last backed up " + when + " — that's a while ago. Tap Back up now to check it's still working."
+    : 'Last backed up ' + when;
+  el.style.color = stale ? 'var(--warn)' : '';
+
+  const note = document.getElementById('backup-skipped');
+  if (note) {
+    if (S.backupSkipped && S.backupSkipped.length) {
+      const n = S.backupSkipped.length;
+      note.style.display = 'block';
+      note.textContent = `Your writing is all backed up. ${n} ${n === 1 ? 'file is' : 'files are'} too big to include (${[...new Set(S.backupSkipped)].join(', ')}) — ${n === 1 ? "it's" : "they're"} safe on this phone, but ${n === 1 ? "it won't" : "they won't"} come back if you lose it.`;
+    } else {
+      note.style.display = 'none';
+    }
   }
 }
 
@@ -2183,12 +2224,22 @@ function confirmCodeSaved() {
 
 async function disableBackup() {
   if (!confirm('Turn off backup? The scrambled copy is deleted and only this device keeps your story.')) return;
+  // Don't claim a deletion that didn't happen. If the server never confirmed,
+  // change nothing — keeping the code is what makes retrying possible, and
+  // "the copy is deleted" has to be true whenever we say it.
+  let deleted = false;
   try {
     const { id } = await deriveBackupMaterial(S.backupCode);
-    await fetch('/.netlify/functions/backup?id=' + id, { method: 'DELETE' });
+    const r = await fetch('/.netlify/functions/backup?id=' + id, { method: 'DELETE' });
+    deleted = r.ok;
   } catch (e) {}
+  if (!deleted) {
+    alert("Couldn't reach the server just now, so nothing has changed — your backup is still on. Try again when you've got signal, so we can be certain the scrambled copy is really gone.");
+    return;
+  }
   S.backupCode = '';
   S.backupLast = 0;
+  S.backupSkipped = [];
   saveState();
   renderBackupCard();
 }
