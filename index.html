@@ -2283,6 +2283,8 @@ async function startLocalAIDownload() {
     // is not the same as a hung GPU, and calling both "stalled" hides which.
     const engine = await localAIEngine(p => {
       lastTick = Date.now();
+      aiPhase = 'downloading the AI';   // CreateMLCEngine does GPU init *and*
+      // the download; once progress ticks we are past the GPU and onto the wire
       const pct = p && typeof p.progress === 'number' ? Math.round(p.progress * 100) : 0;
       status.textContent = pct > 0 ? `Downloading — ${pct}%` : 'Getting ready…';
     }, () => { lastTick = Date.now(); });
@@ -2306,7 +2308,13 @@ async function startLocalAIDownload() {
     settled = true;
     clearInterval(watchdog);
     resetLocalAIEngine();
-    aiDownloadFailed('That didn\'t work — maybe the connection dropped, or your phone ran out of room. Nothing\'s broken; you can try again any time.', e);
+    // The common one by far: a chunk was mid-flight when the signal wobbled.
+    // Each chunk is fetched and stored in one go with no resume, so a blip
+    // kills it outright. Say that plainly instead of blaming their phone.
+    const dropped = /network|cache|fetch|failed to execute/i.test((e && e.message) || '');
+    aiDownloadFailed(dropped
+      ? "The connection kept breaking up, so the download couldn't finish. This one needs steady Wi-Fi — on mobile data it'll keep stopping like this. Nothing's broken, and nothing else in True needs it."
+      : "That didn't work — maybe the connection dropped, or your phone ran out of room. Nothing's broken; you can try again any time.", e);
   }
 }
 
