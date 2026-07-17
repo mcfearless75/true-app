@@ -879,6 +879,13 @@
       </div>
       <div id="ai-dl-error" style="display:none">
         <div style="font-size:14px;color:var(--text2);line-height:1.6;margin:8px 0 14px" id="ai-dl-error-text"></div>
+        <!-- The warm message is for the young person. The truth underneath
+             is for whoever has to fix it. Folded away, never in their face. -->
+        <details style="margin-bottom:14px">
+          <summary style="font-size:13px;color:var(--text3);cursor:pointer">What actually went wrong</summary>
+          <pre id="ai-diag" style="font-size:11px;color:var(--text2);background:var(--bg2);padding:10px;border-radius:8px;margin-top:8px;white-space:pre-wrap;word-break:break-word;user-select:all"></pre>
+          <button class="link-quiet" style="font-size:12px;margin-top:6px" onclick="copyDiag()">Copy this</button>
+        </details>
         <button class="btn-primary" style="width:100%;margin-bottom:8px" onclick="retryLocalAIDownload(false)">Try again</button>
         <button class="btn-secondary" style="width:100%" onclick="closeAIOverlay()">Not now</button>
         <div style="text-align:center;margin-top:12px">
@@ -2171,10 +2178,48 @@ function closeAIOverlay() { document.getElementById('ai-overlay').classList.remo
 // when nothing is happening.
 const AI_STALL_MS = 60000;
 
-function aiDownloadFailed(msg) {
+// Diagnostics for whoever has to fix it — the young person only ever sees
+// the warm sentence unless they go looking. Collected on failure because a
+// phone that fails here is a phone we cannot otherwise see.
+async function aiDiagnostics(err) {
+  const lines = [];
+  lines.push('True — AI download diagnostics');
+  lines.push('when:   ' + new Date().toISOString());
+  lines.push('model:  ' + LOCAL_AI_MODEL);
+  lines.push('error:  ' + (err ? (err.stack || err.message || String(err)) : '(stalled — no progress for 60s)'));
+  lines.push('ua:     ' + navigator.userAgent);
+  const c = navigator.connection;
+  if (c) lines.push('net:    type=' + c.type + ' effective=' + c.effectiveType + ' saveData=' + c.saveData);
+  try {
+    const { quota, usage } = await navigator.storage.estimate();
+    lines.push('storage: free=' + Math.round((quota - usage) / 1e6) + 'MB of ' + Math.round(quota / 1e6) + 'MB quota');
+    lines.push('persisted: ' + await navigator.storage.persisted());
+  } catch (e) { lines.push('storage: unavailable'); }
+  try {
+    const a = await navigator.gpu.requestAdapter();
+    if (!a) lines.push('webgpu: adapter NULL');
+    else {
+      const L = a.limits;
+      lines.push('gpu:    ' + JSON.stringify(a.info || {}));
+      lines.push('limits: maxBuffer=' + Math.round(L.maxBufferSize / 1e6) + 'MB' +
+                 ' maxStorageBinding=' + Math.round(L.maxStorageBufferBindingSize / 1e6) + 'MB' +
+                 ' maxWorkgroupStorage=' + L.maxComputeWorkgroupStorageSize);
+    }
+  } catch (e) { lines.push('webgpu: ' + e.message); }
+  return lines.join('\n');
+}
+
+async function aiDownloadFailed(msg, err) {
   document.getElementById('ai-dl-progress').style.display = 'none';
   document.getElementById('ai-dl-error').style.display = 'block';
   document.getElementById('ai-dl-error-text').textContent = msg;
+  const diag = document.getElementById('ai-diag');
+  diag.textContent = 'Collecting…';
+  diag.textContent = await aiDiagnostics(err);
+}
+
+async function copyDiag() {
+  try { await navigator.clipboard.writeText(document.getElementById('ai-diag').textContent); } catch (e) {}
 }
 
 async function startLocalAIDownload() {
@@ -2192,7 +2237,7 @@ async function startLocalAIDownload() {
     settled = true;
     clearInterval(watchdog);
     resetLocalAIEngine();
-    aiDownloadFailed('The download stopped — your connection probably dropped. Nothing is broken. Try again on Wi-Fi and it\'ll pick up where it left off.');
+    aiDownloadFailed('The download stopped — your connection probably dropped. Nothing is broken. Try again on Wi-Fi and it\'ll pick up where it left off.', null);
   }, 4000);
 
   try {
@@ -2221,7 +2266,7 @@ async function startLocalAIDownload() {
     settled = true;
     clearInterval(watchdog);
     resetLocalAIEngine();
-    aiDownloadFailed('That didn\'t work — maybe the connection dropped, or your phone ran out of room. Nothing\'s broken; you can try again any time.');
+    aiDownloadFailed('That didn\'t work — maybe the connection dropped, or your phone ran out of room. Nothing\'s broken; you can try again any time.', e);
   }
 }
 
