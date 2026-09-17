@@ -8,7 +8,7 @@ A completely private self-awareness app for young people aged 10–21, built spe
 
 ## Running locally
 
-No build step. No dependencies.
+No build step. No app dependencies (only `@netlify/blobs` for the optional backup function).
 
 ```bash
 npx serve .
@@ -16,9 +16,9 @@ npx serve .
 python -m http.server 8080
 ```
 
-Then open `http://localhost:8080`. (Serve over localhost/HTTPS so the service worker and Web Crypto PIN hashing are active.)
+Then open `http://localhost:8080`. Serve over localhost or HTTPS so the service worker and Web Crypto PIN hashing are active.
 
-Demo account for stakeholder walkthroughs: `index.html?demo=1` — loads a pre-populated example without touching real data.
+Demo account for stakeholder walkthroughs: `index.html?demo=1` — loads a pre-populated example without touching real data. Do not send young people this URL.
 
 ---
 
@@ -39,28 +39,31 @@ Demo account for stakeholder walkthroughs: `index.html?demo=1` — loads a pre-p
 | **Need help now** | Static signposting (Childline, Shout, Samaritans, Papyrus) — no tracking |
 | **Your patterns** | On-device mood insights: streak, week trend, best day (Journey) |
 | **Take a minute** | Calm space: box breathing + 5-4-3-2-1 grounding, offered on low check-ins |
-| **A thought back** | Opt-in AI reflection on journal entries via serverless proxy — entry processed once, never stored |
+| **Vault (18+)** | Opt-in life record and on-device story export for care leavers |
 | **Backup** | Zero-knowledge encrypted backup: AES-256-GCM, key derived (PBKDF2-600k) from a recovery code that never leaves the device. Server stores unreadable ciphertext. Restore anywhere with the code |
 
 Installable as a PWA (manifest + service worker, works offline after first load).
+
+There is **no AI**. An on-device reflection feature was built and cut in July 2026 after it misread how care-experienced young people write. Journal text is never sent to a model. See `docs/superpowers/specs/2026-07-17-on-device-ai-design.md`.
 
 ---
 
 ## Privacy & security
 
-- All data lives on the device — text in `localStorage`, photos and voice notes in IndexedDB. No API calls, no analytics, no server.
-- The PIN is never stored — only a per-device salted SHA-256 hash.
+- Text lives in `localStorage`, photos and voice notes in IndexedDB. The only optional network write is encrypted backup ciphertext, and only if the user turns backup on.
+- The PIN is never stored — only a per-device salted SHA-256 hash. The PIN hides the UI; it does not encrypt the on-device store.
 - Repeated wrong PIN attempts trigger a 30-second lockout.
-- **Download my everything** (About Me) exports the user's full story as JSON — a GDPR right, and continuity for care leavers.
+- **Download my everything** (About Me / Vault) exports the user's full story as HTML and JSON — a GDPR right, and continuity for care leavers.
 - Optional backup is zero-knowledge: encrypted on-device, the server holds only ciphertext filed under an id derived from the recovery code. No accounts, no names, nothing readable to hand over.
 - Security headers (CSP, HSTS, no-referrer, frame-deny) set via `netlify.toml`.
-- UK GDPR / ICO Children's Code by design: no data ever leaves the device.
+- Feedback about the *app* (never journal content) can be sent from `feedback.html`. That is separate from a young person's story.
+- UK GDPR / ICO Children's Code by design: no adult logins, no analytics, no monitoring features.
 
 ---
 
 ## Deploy
 
-Netlify: drag the folder to the dashboard, or connect this repo. HTTPS comes free (required for the service worker and Web Crypto).
+Netlify: connect this repo or drag the folder to the dashboard. HTTPS comes free (required for the service worker and Web Crypto).
 
 - Beta link: `https://<site>/beta.html`
 - Council demo: `https://<site>/index.html?demo=1`
@@ -69,21 +72,11 @@ Bump `CACHE` in `sw.js` on every deploy.
 
 ---
 
-## AI reflections setup
-
-"A thought back" needs `ANTHROPIC_API_KEY` set in the Netlify environment:
-
-```bash
-netlify env:set ANTHROPIC_API_KEY <your-key>
-```
-
-Without the key the endpoint returns 503 and the app silently skips the feature.
-The function (`netlify/functions/reflect.mjs`) is stateless — entries are processed once and never stored or logged.
-
 ## Roadmap
 
-- [ ] Formspree ID into `feedback.html`
-- [ ] Leaving-care export pack (18+ mode)
+- [x] Formspree on `feedback.html`
+- [x] Leaving-care Vault + story export (18+)
+- [ ] Encrypt on-device state with a key derived from the PIN
 - [ ] Capacitor.js wrapper for iOS/Android (after beta validation)
 
 ---
@@ -95,4 +88,4 @@ The function (`netlify/functions/reflect.mjs`) is stateless — entries are proc
 - Mood colours are semantic, never brand — do not let a rebrand script touch them
 - **Tone:** warm, direct, honest — never clinical. UK English.
 
-See `CLAUDE.md` and `REIGNITE.md` for full product context.
+See `CLAUDE.md`, `REBRAND.md` and `REIGNITE.md` for product context. Treat `REIGNITE.md` as a July 2026 snapshot; this README is the live feature list.
