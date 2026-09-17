@@ -1,5 +1,5 @@
-const CACHE = 'true-v22';
-const SHELL = ['./index.html', './beta.html', './feedback.html', './manifest.json', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
+const CACHE = 'true-v23';
+const SHELL = ['./index.html', './beta.html', './feedback.html', './commissioners.html', './manifest.json', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -12,13 +12,8 @@ self.addEventListener('activate', e => {
   );
 });
 
-// HTML: network-first so deploys arrive on the next load; cache is the
-// offline fallback. Static assets: cache-first for speed.
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  // Cross-origin (CDN, AI model shards) is never ours to cache — WebLLM
-  // manages its own model cache, and copying ~700MB into this one would
-  // get wiped on every version bump.
   if (new URL(e.request.url).origin !== self.location.origin) return;
   const isPage = e.request.mode === 'navigate' || (e.request.headers.get('accept') || '').includes('text/html');
   if (isPage) {
