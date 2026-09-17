@@ -5,7 +5,11 @@
 
 [functions]
   directory = "netlify/functions"
-# Camera and microphone allowed so the memory box works. Geolocation stays off.
+# Security headers. The app loads no third-party scripts and makes no calls
+# out except its own encrypted-backup function. formspree.io is allowed for
+# feedback.html only — an app feedback form, never anything a user writes.
+# Camera and microphone are allowed so the memory box (photos / voice notes)
+# works. Geolocation stays off.
 
 [[headers]]
   for = "/*"
