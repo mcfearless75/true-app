@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>True — Your words. Your truth.</title>
   <meta name="description" content="True is your private space to track how you feel, reflect, and see how far you've come.">
   <meta name="theme-color" content="#1A7A6E">
@@ -56,52 +56,41 @@
       --cat-new-bg:      #E6F2FA;  --cat-new-fg:      #854F0B;
       --cat-rel-bg:      #FBEAF0;  --cat-rel-fg:      #993556;
 
-      /* ── UI neutrals ───────────────────────────────────────────── */
+      /* ── UI neutrals — warm paper, not clinical white or cold grey ─ */
       --warn:   #9A5B0A;  /* UI caution only — deliberately NOT a mood colour */
       --rec:    #C94F35;  /* "recording" red — same value as --mood-1 today, but
                              a different thing: moving one must not move the other */
-      --text:   #1a1a18;
-      --text2:  #5f5e5a;
-      --text3:  #888780;
-      --bg:     #ffffff;
-      --bg2:    #f7f6f3;
-      --bg3:    #f1efe8;
-      --border: rgba(0,0,0,0.10);
-      --border2: rgba(0,0,0,0.18);
-      --radius: 12px;
-      --radius-sm: 8px;
-      --shadow: 0 2px 12px rgba(0,0,0,0.06);
+      --text:   #2C281F;
+      --text2:  #6B6458;
+      --text3:  #8F8778;
+      --bg:     #FBF7F0;
+      --bg2:    #F3EDE3;
+      --bg3:    #E8DFD0;
+      --border: rgba(80, 60, 30, 0.10);
+      --border2: rgba(80, 60, 30, 0.16);
+      --radius: 16px;
+      --radius-sm: 12px;
+      --shadow: 0 8px 28px rgba(80, 55, 20, 0.07);
     }
 
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --text:   #f0ede8;
-        --text2:  #a09d97;
-        --text3:  #6b6965;
-        --bg:     #1a1917;
-        --bg2:    #222120;
-        --bg3:    #2a2927;
-        --border: rgba(255,255,255,0.10);
-        --border2: rgba(255,255,255,0.18);
-        --trlt:   #0d2e2b;
-        --gllt:   #0d2030;
-        --warn:   #D9A05B;
-      }
-    }
-
+    /* Stay warm even if the phone is in dark mode. A charcoal UI
+       felt bleak for the people this is for. Mood colours unchanged. */
     html, body {
       height: 100%;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
       background: var(--bg3);
       color: var(--text);
       -webkit-font-smoothing: antialiased;
+      color-scheme: light;
     }
 
     /* ─── App Shell ─────────────────────────────────────────────── */
     #app {
       max-width: 430px;
       margin: 0 auto;
-      background: var(--bg);
+      background:
+        radial-gradient(120% 60% at 50% -10%, rgba(230, 245, 244, 0.9), transparent 55%),
+        var(--bg);
       min-height: 100vh;
       min-height: 100dvh;
       display: flex;
@@ -112,12 +101,12 @@
 
     /* ─── Header ─────────────────────────────────────────────────── */
     #header {
-      padding: 14px 16px 12px;
-      border-bottom: 1px solid var(--border);
+      padding: 16px 18px 14px;
+      border-bottom: none;
       display: flex;
       align-items: center;
       gap: 10px;
-      background: var(--bg);
+      background: transparent;
       position: sticky;
       top: 0;
       z-index: 5;
@@ -131,15 +120,15 @@
     }
 
     .true-wordmark {
-      font-size: 17px;
+      font-size: 18px;
       font-weight: 700;
       letter-spacing: -0.03em;
-      color: var(--text);
+      color: var(--trdark);
     }
 
     .avatar {
-      width: 32px;
-      height: 32px;
+      width: 34px;
+      height: 34px;
       border-radius: 50%;
       background: var(--trlt);
       display: flex;
@@ -152,13 +141,13 @@
     }
 
     .lock-btn {
-      font-size: 11px;
-      color: var(--text3);
+      font-size: 12px;
+      color: var(--text2);
       cursor: pointer;
-      padding: 4px 9px;
-      border: 1px solid var(--border2);
+      padding: 6px 12px;
+      border: 1px solid var(--border);
       border-radius: 20px;
-      background: none;
+      background: rgba(255,255,255,0.55);
       font-family: inherit;
     }
 
@@ -168,7 +157,7 @@
     .view {
       display: none;
       flex: 1;
-      padding: 1.25rem 1rem 1.5rem;
+      padding: 0.6rem 1.1rem 1.8rem;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
     }
@@ -178,9 +167,10 @@
     /* ─── Nav ────────────────────────────────────────────────────── */
     #nav {
       display: flex;
-      border-top: 1px solid var(--border);
-      background: var(--bg);
-      padding: 6px 0 max(10px, env(safe-area-inset-bottom));
+      border-top: none;
+      background: rgba(251, 247, 240, 0.92);
+      backdrop-filter: blur(12px);
+      padding: 8px 6px max(12px, env(safe-area-inset-bottom));
       position: sticky;
       bottom: 0;
     }
@@ -213,7 +203,9 @@
       inset: 0;
       max-width: 430px;
       margin: 0 auto;
-      background: var(--bg);
+      background:
+        radial-gradient(90% 50% at 50% 0%, #E6F5F4 0%, transparent 58%),
+        var(--bg);
       z-index: 20;
       display: flex;
       flex-direction: column;
@@ -234,10 +226,10 @@
     }
 
     .lock-wordmark {
-      font-size: 28px;
+      font-size: 30px;
       font-weight: 700;
       letter-spacing: -0.04em;
-      color: var(--text);
+      color: var(--trdark);
     }
 
     .lock-tagline {
@@ -274,13 +266,14 @@
       width: 64px;
       height: 64px;
       border-radius: 50%;
-      border: 1px solid var(--border2);
-      background: var(--bg2);
+      border: 1px solid transparent;
+      background: #fff;
       font-size: 20px;
-      font-weight: 400;
+      font-weight: 500;
       cursor: pointer;
       font-family: inherit;
       color: var(--text);
+      box-shadow: 0 4px 14px rgba(80, 55, 20, 0.08);
       transition: background 0.1s, transform 0.08s;
     }
 
@@ -296,18 +289,19 @@
 
     /* ─── Typography ─────────────────────────────────────────────── */
     .page-title {
-      font-size: 22px;
+      font-size: 26px;
       font-weight: 700;
-      letter-spacing: -0.02em;
+      letter-spacing: -0.03em;
       color: var(--text);
-      margin-bottom: 4px;
+      margin-bottom: 6px;
+      line-height: 1.15;
     }
 
     .page-sub {
-      font-size: 13px;
+      font-size: 15px;
       color: var(--text2);
-      margin-bottom: 20px;
-      line-height: 1.5;
+      margin-bottom: 22px;
+      line-height: 1.55;
     }
 
     .section-label {
@@ -323,25 +317,27 @@
 
     /* ─── Cards ──────────────────────────────────────────────────── */
     .card {
-      background: var(--bg);
+      background: #fff;
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 1rem;
-      margin-bottom: 10px;
+      padding: 1.05rem 1.1rem;
+      margin-bottom: 12px;
+      box-shadow: 0 2px 10px rgba(80, 55, 20, 0.04);
     }
 
     .card-soft {
-      background: var(--bg2);
+      background: #fff;
       border-radius: var(--radius);
-      padding: 1rem;
-      margin-bottom: 10px;
+      padding: 1.1rem 1.15rem;
+      margin-bottom: 12px;
+      box-shadow: 0 4px 16px rgba(80, 55, 20, 0.05);
     }
 
     .card-true {
       background: var(--trlt);
       border-radius: var(--radius);
-      padding: 1rem;
-      margin-bottom: 10px;
+      padding: 1.1rem 1.15rem;
+      margin-bottom: 12px;
     }
 
     /* ─── Buttons ────────────────────────────────────────────────── */
@@ -349,12 +345,13 @@
       background: var(--tr);
       color: #fff;
       border: none;
-      padding: 11px 18px;
-      border-radius: var(--radius-sm);
-      font-size: 14px;
+      padding: 13px 18px;
+      border-radius: 999px;
+      font-size: 15px;
       font-weight: 600;
       cursor: pointer;
       font-family: inherit;
+      box-shadow: 0 6px 16px rgba(26, 122, 110, 0.22);
       transition: background 0.1s, transform 0.08s;
     }
 
@@ -362,10 +359,10 @@
     .btn-primary:active { transform: scale(0.98); }
 
     .btn-secondary {
-      background: none;
-      border: 1px solid var(--border2);
-      padding: 10px 16px;
-      border-radius: var(--radius-sm);
+      background: #fff;
+      border: 1px solid var(--border);
+      padding: 12px 16px;
+      border-radius: 999px;
       font-size: 14px;
       cursor: pointer;
       color: var(--text);
@@ -384,9 +381,10 @@
     }
     .overlay.open { display: flex; }
     .overlay-card {
-      background: var(--bg); border-radius: 20px;
-      padding: 24px 22px; width: 100%; max-width: 420px;
+      background: var(--bg); border-radius: 24px;
+      padding: 26px 22px; width: 100%; max-width: 420px;
       max-height: 82vh; overflow-y: auto;
+      box-shadow: 0 18px 50px rgba(40, 30, 10, 0.18);
     }
     .help-line {
       display: flex; justify-content: space-between; align-items: center;
@@ -483,16 +481,18 @@
       display: flex;
       align-items: center;
       gap: 13px;
-      padding: 12px 13px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
+      padding: 14px 15px;
+      border: 1px solid transparent;
+      border-radius: 16px;
       cursor: pointer;
       margin-bottom: 8px;
+      background: #fff;
+      box-shadow: 0 2px 10px rgba(80, 55, 20, 0.04);
       transition: background 0.12s, border-color 0.12s;
     }
 
-    .mood-row:hover { background: var(--bg2); }
-    .mood-row.selected { border-color: var(--tr); background: var(--trlt); }
+    .mood-row:hover { background: #fff; }
+    .mood-row.selected { border-color: var(--tr); background: var(--trlt); box-shadow: none; }
 
     .mood-dot {
       width: 16px;
@@ -631,7 +631,9 @@
       inset: 0;
       max-width: 430px;
       margin: 0 auto;
-      background: var(--bg);
+      background:
+        radial-gradient(90% 46% at 50% 0%, #E6F5F4 0%, transparent 58%),
+        var(--bg);
       z-index: 15;
       display: flex;
       flex-direction: column;
@@ -797,8 +799,9 @@
       <div class="pin-key empty"></div><button class="pin-key" onclick="lockTap(0)">0</button><button class="pin-key del" onclick="lockDel()">⌫</button>
     </div>
     <div class="pin-hint" id="lock-hint">Enter your code</div>
-    <div style="margin-top:16px">
+    <div style="margin-top:16px;text-align:center">
       <button class="link-quiet" onclick="openHelp()">Need to talk to someone right now?</button>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px">Opens help without unlocking your words</div>
     </div>
   </div>
 
@@ -838,7 +841,7 @@
 
     <div class="section-label">THIS WEEK</div>
     <div class="card-soft mood-bar-chart" id="home-moodbar"></div>
-    <div style="text-align:right;margin-top:4px">
+    <div style="text-align:right;margin-top:4px" id="home-share-wrap">
       <button class="link-quiet" style="color:var(--tr);text-decoration:none" onclick="openShareWeek()">Share my week &rarr;</button>
     </div>
 
@@ -865,8 +868,9 @@
     <div class="overlay-card">
       <div class="page-title" style="font-size:20px">Share my week</div>
       <div style="font-size:14px;color:var(--text2);line-height:1.6;margin:8px 0 14px">
-        This is <strong>everything</strong> that would be shared — just how you felt each day.
-        None of your notes, journal or letters. Ever. And it only goes where you send it.
+        This is a picture of the week, not a report. Preview below is <strong>the whole payload</strong> —
+        just the day and the mood word. Notes, journal and letters stay on this phone.
+        Nothing is sent anywhere unless you tap Share or Copy, and True does not keep a copy of what you sent.
       </div>
       <div class="card-soft" id="share-preview" style="margin-bottom:16px"></div>
       <div style="display:flex;gap:8px">
@@ -1070,6 +1074,25 @@
 
     <div id="me-vault"></div>
 
+    <div class="section-label">ON THIS PHONE</div>
+    <div class="card-soft">
+      <div style="font-size:14px;color:var(--text);font-weight:600">Look like notes</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.55;margin:6px 0 12px">
+        Changes the name on screen to “Notes” so True is less obvious if someone picks up your phone.
+        Your words stay the same. Already-installed home screen icons do not change until you add the app again.
+      </div>
+      <button class="btn-secondary btn-sm" id="stealth-btn" onclick="toggleStealth()"></button>
+    </div>
+
+    <div class="section-label">KEEPING IT SAFE</div>
+    <div class="card-soft" id="backup-invite-me" style="display:none">
+      <div style="font-size:14px;color:var(--text);font-weight:600">Phones get lost</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.55;margin:6px 0 12px">
+        Turn on backup and a scrambled copy lives online. Only your recovery code can read it — not us, not a carer.
+      </div>
+      <button class="btn-primary btn-sm" onclick="enableBackup()">Turn on backup</button>
+    </div>
+
     <div class="section-label">MY DATA</div>
     <div class="card-soft">
       <div style="font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:12px">
@@ -1221,7 +1244,11 @@ No one else will read this. It locks until the date you choose."></textarea>
         This is different: the record <strong>you</strong> kept. One file that opens anywhere, no app needed.
         It's made on this device and goes only where you put it.
       </div>
-      <button class="btn-primary" style="width:100%;margin-bottom:8px" onclick="exportStory()">Download my story</button>
+      <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:10px">
+        <input type="checkbox" id="pack-moods" style="margin-top:3px">
+        <span>Include how I felt (moods). Off by default — most people only take the story they would hand to someone.</span>
+      </label>
+      <button class="btn-primary" style="width:100%;margin-bottom:8px" onclick="exportStory()">Download my leaving-care pack</button>
       <button class="btn-secondary" style="width:100%" onclick="exportData()">Download my everything (JSON)</button>
       <div id="vault-export-msg" style="font-size:13px;color:var(--tr);margin-top:10px;display:none">Done — it's in your downloads.</div>
     </div>
@@ -1295,9 +1322,9 @@ const CAT_STYLES = {
 const BRAND_EXPORT = { tr: '#1A7A6E', trdark: '#0F5349', trlt: '#E6F5F4', acc: '#1D6FA4' };
 
 // ─── Age-adaptive copy ────────────────────────────────────────
-// The 10-13 band gets plainer words. Same app, same features, same
-// respect — nothing is hidden from younger users, it just reads for
-// a 12-year-old. Index 0 = standard, index 1 = 10-13.
+// The 10-13 band gets plainer words and a quieter nav (no letters,
+// no share-my-week). Same respect — nothing is deleted, just not
+// in the way. Index 0 = standard, index 1 = 10-13.
 const YOUNG_BAND = '10-13';
 const isYounger = () => S.age === YOUNG_BAND;
 
@@ -1356,6 +1383,45 @@ function applyAgeCopy() {
   });
   const jb = document.getElementById('btn-journey-ms-text');
   if (jb) jb.textContent = 'Add ' + msWord();
+  applyNavForAge();
+  applyStealth();
+}
+
+function applyNavForAge() {
+  const young = isYounger();
+  const letter = document.getElementById('nb-letter');
+  if (letter) letter.style.display = young ? 'none' : '';
+  const share = document.getElementById('home-share-wrap');
+  if (share) share.style.display = young ? 'none' : '';
+  const letterPill = document.querySelector('#journey-filters [data-f="letter"]');
+  if (letterPill) letterPill.style.display = young ? 'none' : '';
+}
+
+function applyStealth() {
+  const on = !!S.stealth;
+  const mark = document.querySelector('.true-wordmark');
+  if (mark) mark.textContent = on ? 'notes' : 'true';
+  const lockMark = document.querySelector('.lock-wordmark');
+  if (lockMark) lockMark.textContent = on ? 'notes' : 'true';
+  const lockTag = document.querySelector('.lock-tagline');
+  if (lockTag) lockTag.textContent = on ? 'Private notes' : 'Your words. Your truth.';
+  document.title = on ? 'Notes' : 'True — Your words. Your truth.';
+  const btn = document.getElementById('stealth-btn');
+  if (btn) btn.textContent = on ? 'Show my real name again' : 'Look like notes';
+}
+
+function toggleStealth() {
+  S.stealth = !S.stealth;
+  applyStealth();
+  saveState();
+}
+
+function offerBackupOnce() {
+  if (S.backupCode || S.backupOffered) return;
+  S.backupOffered = true;
+  saveState();
+  const card = document.getElementById('backup-invite-me');
+  if (card) card.style.display = 'block';
 }
 
 // Age-adaptive prompts — band chosen from S.age at render time
@@ -1456,6 +1522,8 @@ let S = {
   backupCode: '',    // recovery code; deriving key + id happens on demand
   backupLast: 0,
   vaultOn: false,    // leaving-care vault (18+) — stays false until they opt in
+  stealth: false,    // in-app "Notes" disguise
+  backupOffered: false,
 };
 
 // Demo data — loads ONLY with ?demo=1 in the URL. Real users start clean.
@@ -1492,9 +1560,57 @@ let backupDirty = false;
 // Returns false if the write didn't land. NEVER swallow this: a save that
 // silently fails loses someone's words while telling them it worked, which
 // is the worst thing this app could do.
-function saveState() {
+let sessionKey = null;          // AES key in RAM only, after a correct PIN
+let pendingEnc = null;          // v2 ciphertext waiting for unlock
+
+function stateMeta() {
+  return {
+    v: 2,
+    pinSalt: S.pinSalt || '',
+    pinHash: S.pinHash || '',
+    pinFails: S.pinFails || 0,
+    pinLockUntil: S.pinLockUntil || 0,
+    stealth: !!S.stealth,
+    nameHint: S.stealth ? '' : (S.name || ''),
+  };
+}
+
+async function deriveSessionKey(pin, salt) {
+  if (!(crypto.subtle && crypto.subtle.importKey) || !pin || !salt) return null;
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(String(salt) + ':' + String(pin)), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: new TextEncoder().encode('true-state-v2'), iterations: 210000, hash: 'SHA-256' },
+    base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+  );
+}
+
+function b64enc(u8) {
+  let s = '';
+  const arr = u8 instanceof Uint8Array ? u8 : new Uint8Array(u8);
+  for (let i = 0; i < arr.length; i++) s += String.fromCharCode(arr[i]);
+  return btoa(s);
+}
+function b64dec(str) {
+  const bin = atob(str);
+  const u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return u8;
+}
+
+async function saveState() {
   try {
-    localStorage.setItem('true_state', JSON.stringify(S));
+    const meta = stateMeta();
+    if (sessionKey) {
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const buf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, sessionKey, new TextEncoder().encode(JSON.stringify(S)));
+      meta.iv = b64enc(iv);
+      meta.data = b64enc(buf);
+    } else {
+      // First-run / no crypto: keep a readable copy so onboarding cannot strand them.
+      meta.v = 1;
+      meta.state = S;
+    }
+    localStorage.setItem('true_state', JSON.stringify(meta));
     backupDirty = true;
     hideSaveWarning();
     return true;
@@ -1510,11 +1626,66 @@ function hideSaveWarning() { const el = document.getElementById('save-warn'); if
 function loadState() {
   try {
     const raw = localStorage.getItem('true_state');
-    if (raw) {
-      const saved = JSON.parse(raw);
-      S = Object.assign(S, saved);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    if (saved && saved.data && saved.iv) {
+      S.pinSalt = saved.pinSalt || '';
+      S.pinHash = saved.pinHash || '';
+      S.pinFails = saved.pinFails || 0;
+      S.pinLockUntil = saved.pinLockUntil || 0;
+      S.stealth = !!saved.stealth;
+      pendingEnc = saved;
+      return;
     }
+    const body = (saved && saved.state) ? saved.state : saved;
+    S = Object.assign(S, body || {});
+    if (saved && saved.stealth != null) S.stealth = !!saved.stealth;
   } catch(e) {}
+}
+
+async function openEncryptedState(pin) {
+  sessionKey = await deriveSessionKey(pin, S.pinSalt);
+  if (pendingEnc && sessionKey) {
+    try {
+      const plain = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: b64dec(pendingEnc.iv) },
+        sessionKey,
+        b64dec(pendingEnc.data)
+      );
+      const body = JSON.parse(new TextDecoder().decode(plain));
+      S = Object.assign(S, body);
+    } catch (e) {
+      sessionKey = null;
+      return false;
+    }
+    pendingEnc = null;
+  }
+  return true;
+}
+
+function lockMemory() {
+  // Drop the story from RAM while locked. Meta stays so the PIN still works.
+  const meta = {
+    name: S.stealth ? '' : S.name,
+    age: S.age,
+    pinHash: S.pinHash,
+    pinSalt: S.pinSalt,
+    pinFails: S.pinFails,
+    pinLockUntil: S.pinLockUntil,
+    stealth: S.stealth,
+    vaultOn: S.vaultOn,
+    backupCode: S.backupCode,
+    backupLast: S.backupLast,
+    backupOffered: S.backupOffered,
+  };
+  sessionKey = null;
+  S = Object.assign({
+    name: '', age: '', pin: '', pinHash: '', pinSalt: '', pinFails: 0, pinLockUntil: 0,
+    promptIndex: 0, selectedMoodVal: null, selectedMoodLabel: null, selectedMsCat: null,
+    journeyFilter: 'all', checkedInToday: false, moods: [], journals: [], milestones: [],
+    letters: [], selectedValues: [], goals: [], selfNote: '', backupCode: '', backupLast: 0,
+    vaultOn: false, stealth: false, backupOffered: false,
+  }, meta);
 }
 
 // ─── PIN security ─────────────────────────────────────────────
@@ -1539,7 +1710,8 @@ async function setPin(pin) {
   S.pinSalt = randomSalt();
   S.pinHash = await hashPin(pin, S.pinSalt);
   S.pin = '';
-  saveState();
+  sessionKey = await deriveSessionKey(pin, S.pinSalt);
+  await saveState();
 }
 
 async function verifyPin(pin) {
@@ -1620,12 +1792,13 @@ function updateObDots() {
   document.querySelectorAll('#ob-dots .pin-dot').forEach((d,i) => d.classList.toggle('filled', i < entry.length));
 }
 
-function finishOnboarding() {
+async function finishOnboarding() {
   document.getElementById('onboarding').classList.add('hidden');
   freezeShell(false);
   S.checkedInToday = false;
-  saveState();
+  await saveState();
   initApp();
+  offerBackupOnce();
 }
 
 // ─── Lock Screen ──────────────────────────────────────────────
@@ -1642,10 +1815,18 @@ function lockTap(n) {
   updateLockDots();
   if (lockEntry.length === 4) {
     setTimeout(async () => {
-      if (await verifyPin(lockEntry.join(''))) {
+      const pin = lockEntry.join('');
+      if (await verifyPin(pin)) {
+        const opened = await openEncryptedState(pin);
+        if (!opened) {
+          document.getElementById('lock-hint').textContent = 'Could not open your story — try again';
+          lockEntry = [];
+          updateLockDots();
+          return;
+        }
         S.pinFails = 0;
         S.pinLockUntil = 0;
-        saveState();
+        await saveState();
         unlock();
       } else {
         S.pinFails = (S.pinFails || 0) + 1;
@@ -1681,10 +1862,13 @@ function unlock() {
   lockEntry = [];
   updateLockDots();
   document.getElementById('lock-hint').textContent = 'Enter your code';
-  renderHome();
+  initApp();
 }
 
-function doLock() {
+async function doLock() {
+  await saveState();
+  lockMemory();
+  applyStealth();
   document.getElementById('lock-screen').classList.remove('hidden');
   freezeShell(true);
   lockEntry = [];
@@ -1693,6 +1877,7 @@ function doLock() {
 
 // ─── Navigation ───────────────────────────────────────────────
 function showView(name) {
+  if (name === 'letter' && isYounger()) name = 'home';
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('view-' + name).classList.add('active');
@@ -1843,7 +2028,7 @@ function nextPrompt() {
   document.getElementById('home-prompt-text').textContent = currentPrompt();
 }
 
-function saveJournal() {
+async function saveJournal() {
   const t = document.getElementById('journal-text').value.trim();
   if (!t) return;
   const now = new Date();
@@ -1852,7 +2037,7 @@ function saveJournal() {
   S.journals.push({d, p: promptUsed, t, ts: Date.now()});
   // If it didn't reach the disk, don't pretend. Take it back out and leave
   // their words in the box so nothing they wrote is lost.
-  if (!saveState()) { S.journals.pop(); return; }
+  if (!(await saveState())) { S.journals.pop(); return; }
   document.getElementById('journal-text').value = '';
   renderJournal();
 }
@@ -1867,6 +2052,9 @@ function renderMe() {
   document.getElementById('self-note-text').value = S.selfNote || '';
   renderBackupCard();
   renderVaultCards();
+  applyStealth();
+  const invite = document.getElementById('backup-invite-me');
+  if (invite) invite.style.display = (S.backupCode || !S.backupOffered) ? 'none' : 'block';
 }
 
 function toggleValue(v) {
@@ -2602,7 +2790,7 @@ function letterTab(tab) {
   if (tab === 'letters') renderLettersList();
 }
 
-function saveLetter() {
+async function saveLetter() {
   const body = document.getElementById('letter-body').value.trim();
   if (!letterSelectedAge) { alert('Choose an age to open this at first.'); return; }
   if (!body) { alert('Write something first — even a few lines.'); return; }
@@ -2618,7 +2806,7 @@ function saveLetter() {
   });
   // Same rule as the journal: if it didn't reach the disk, don't clear the
   // page and don't claim it's sealed.
-  if (!saveState()) { S.letters.pop(); return; }
+  if (!(await saveState())) { S.letters.pop(); return; }
   document.getElementById('letter-body').value = '';
   letterSelectedAge = null;
   document.getElementById('letter-opening').textContent = 'Dear future me,';
@@ -2866,7 +3054,8 @@ async function exportStory() {
   } catch (e) { /* story still exports, just without media */ }
 
   const fmtDay = ts => ts ? new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
-  const items = collectTimeline().reverse(); // oldest first — a story reads forward
+  const includeMoods = !!(document.getElementById('pack-moods') && document.getElementById('pack-moods').checked);
+  const items = collectTimeline().reverse().filter(item => includeMoods || item.type !== 'mood');
 
   const entries = items.map(item => {
     const when = item.ts ? fmtDay(item.ts) : esc(item.d);
@@ -2929,8 +3118,8 @@ async function exportStory() {
   footer{margin-top:48px;font-size:13px;color:#888780;border-top:1px solid #eee;padding-top:16px}
   @media print{body{background:#fff}article{break-inside:avoid}}
 </style></head><body>
-<h1>My Story</h1>
-<div class="tag">Your words. Your truth.</div>
+<h1>This is me</h1>
+<div class="tag">A leaving-care pack I made myself. Your words. Your truth.</div>
 <div class="meta">${S.name ? 'Kept by ' + esc(S.name) + ' &middot; ' : ''}saved from my True app on ${fmtDay(Date.now())}</div>
 ${about ? '<div class="about">' + about + '</div>' : ''}
 ${entries || '<p>Nothing recorded yet.</p>'}
@@ -2958,6 +3147,8 @@ function initApp() {
     document.getElementById('home-greeting').textContent = `Hey ${S.name}.`;
   }
   applyAgeCopy();
+  applyNavForAge();
+  applyStealth();
   renderHome();
 }
 
@@ -2967,6 +3158,7 @@ async function boot() {
   // Demo mode — ?demo=1 loads a pre-populated example account
   if (new URLSearchParams(location.search).get('demo') === '1' && !localStorage.getItem('true_state')) {
     S = Object.assign(S, JSON.parse(JSON.stringify(DEMO_DATA)));
+    await setPin(DEMO_DATA.pin);
   }
 
   // Migrate legacy plaintext PIN to salted hash, then clear it
@@ -2974,17 +3166,19 @@ async function boot() {
     await setPin(S.pin);
   }
 
-  // First run — show onboarding
-  if (!S.name) {
+  applyStealth();
+
+  // First run — show onboarding (encrypted stores have no name until unlock)
+  if (!S.pinHash && !S.name && !pendingEnc) {
     showOnboarding();
     return;
   }
 
-  // Has PIN — show lock
-  if (S.pinHash) {
-    document.getElementById('lock-hint').textContent = `Welcome back${S.name ? ', '+S.name : ''} — enter your code`;
+  // Has PIN — show lock. Do not render the story behind it.
+  if (S.pinHash || pendingEnc) {
+    const hintName = S.stealth ? '' : (S.name || '');
+    document.getElementById('lock-hint').textContent = hintName ? `Welcome back, ${hintName} — enter your code` : 'Enter your code';
     freezeShell(true);
-    initApp();
     return;
   }
 
