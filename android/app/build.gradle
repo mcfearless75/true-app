@@ -16,8 +16,10 @@ android {
         applicationId "uk.co.trueapp.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // Codemagic passes -PversionCode (Play needs a new one per upload).
+        // Local builds use these defaults — bump them by hand before uploading.
+        versionCode((project.findProperty('versionCode') ?: '1') as Integer)
+        versionName((project.findProperty('versionName') ?: '1.0') as String)
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

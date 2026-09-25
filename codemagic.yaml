@@ -1,11 +1,77 @@
-# Codemagic: builds the iOS app in the cloud (no Mac needed) and sends it
-# to TestFlight. Setup steps are in docs/codemagic-ios.md.
+# Codemagic: builds the apps in the cloud and sends them to testers.
+#   ios-testflight   → TestFlight          setup: docs/codemagic-ios.md
+#   android-internal → Play internal test  setup: docs/codemagic-android.md
 #
-# Start a build from the Codemagic dashboard (Start new build → ios-testflight).
-# It doesn't build on every push: the website deploys from main many times
-# a day, and each iOS build uses Mac minutes.
+# Start builds from the Codemagic dashboard (Start new build → pick one).
+# Nothing builds on every push: the website deploys from main many times a
+# day, and every build uses Codemagic minutes.
 
 workflows:
+  android-internal:
+    name: Android → Play internal testing
+    instance_type: linux_x2
+    max_build_duration: 45
+
+    environment:
+      android_signing:
+        # The upload key added under Code signing identities → Android
+        # keystores. The reference name there must match this exactly.
+        - true_upload_key
+      groups:
+        # Holds GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS (secure)
+        - google_play
+      vars:
+        PACKAGE_NAME: uk.co.trueapp.app
+        VERSION_NAME: "1.0"
+      node: 22        # Capacitor 8 needs Node 22 or newer
+      java: 21        # and Java 21 for its Android Gradle Plugin
+
+    scripts:
+      - name: Install dependencies
+        script: npm ci
+
+      - name: Build the app's web bundle (www/, with native.js)
+        script: npm run build:app
+
+      - name: Copy it into the Android project
+        script: npx cap sync android
+
+      - name: Point Gradle at the Android SDK
+        script: echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/android/local.properties"
+
+      - name: Hand the upload key to the release build
+        script: |
+          # build.gradle signs from android/keystore.properties, the same file
+          # used for local builds. Codemagic supplies the key as CM_* variables.
+          # Backslashes are doubled because .properties treats \ as an escape.
+          esc() { printf '%s' "$1" | sed 's/\\/\\\\/g'; }
+          {
+            echo "storeFile=$CM_KEYSTORE_PATH"
+            echo "storePassword=$(esc "$CM_KEYSTORE_PASSWORD")"
+            echo "keyAlias=$(esc "$CM_KEY_ALIAS")"
+            echo "keyPassword=$(esc "$CM_KEY_PASSWORD")"
+          } > "$CM_BUILD_DIR/android/keystore.properties"
+
+      - name: Build the signed .aab with a version code Play hasn't seen
+        script: |
+          LATEST=$(google-play get-latest-build-number --package-name "$PACKAGE_NAME" 2>/dev/null || true)
+          NEXT="$BUILD_NUMBER"
+          if [ -n "$LATEST" ] && [ "$((LATEST + 1))" -gt "$NEXT" ]; then NEXT=$((LATEST + 1)); fi
+          echo "versionCode: $NEXT"
+          cd "$CM_BUILD_DIR/android"
+          ./gradlew bundleRelease -PversionCode="$NEXT" -PversionName="$VERSION_NAME"
+
+    artifacts:
+      - android/app/build/outputs/bundle/release/*.aab
+
+    publishing:
+      google_play:
+        credentials: $GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
+        # Play keeps apps that have never been reviewed as drafts; switch this
+        # to false once True's first release has gone through review.
+        submit_as_draft: true
+
   ios-testflight:
     name: iOS → TestFlight
     instance_type: mac_mini_m2
