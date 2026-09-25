@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application
         android:allowBackup="false"
@@ -42,4 +43,9 @@
     <!-- Voice notes in the memory box. Asked for only when they tap record. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Quick unlock with a fingerprint or face -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <!-- The notifications plugin asks for exact alarms; a daily nudge doesn't
+         need them, and Play only allows them for alarm/calendar apps. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" tools:node="remove" />
 </manifest>

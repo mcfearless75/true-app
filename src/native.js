@@ -14,6 +14,8 @@
 
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+import { NativeBiometric, AccessControl, BiometryType, BiometricAuthError } from '@capgo/capacitor-native-biometric';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
 const DIR = Directory.LibraryNoCloud;
 const MEDIA = 'media';
@@ -108,9 +110,100 @@ async function clearAll() {
   seq = 0;
 }
 
+// ─── Face ID / fingerprint ─────────────────────────────────────
+// The story's key comes from the PIN, so biometrics have to hand the PIN
+// back. It sits in the Keychain / Android Keystore with BIOMETRY_CURRENT_SET:
+// the secure hardware only releases it after a face or finger match, and
+// wipes it if anyone enrols a new face or finger. In foster care that
+// matters — a carer adding their fingerprint must not inherit a way in.
+const PIN_KEY = 'true_pin';
+
+function bioLabel(type) {
+  switch (type) {
+    case BiometryType.FACE_ID: return 'Face ID';
+    case BiometryType.TOUCH_ID: return 'Touch ID';
+    case BiometryType.FINGERPRINT: return 'fingerprint';
+    case BiometryType.FACE_AUTHENTICATION: return 'face unlock';
+    case BiometryType.MULTIPLE: return 'face or fingerprint';
+    default: return 'fingerprint';
+  }
+}
+
+async function bioAvailable() {
+  try {
+    const r = await NativeBiometric.isAvailable({ useFallback: false });
+    return { available: !!r.isAvailable && !!r.strongBiometryIsAvailable, label: bioLabel(r.biometryType) };
+  } catch {
+    return { available: false, label: '' };
+  }
+}
+
+async function bioEnable(pin) {
+  await NativeBiometric.setData({
+    key: PIN_KEY, value: pin,
+    accessControl: AccessControl.BIOMETRY_CURRENT_SET,
+    title: 'Turn on quick unlock', negativeButtonText: 'Not now',
+  });
+}
+
+// → { pin } on a match; { gone: true } when the phone wiped it because a
+// face/finger was added (or it never existed); {} for cancel/lockout/other
+async function bioGetPin(label) {
+  try {
+    const r = await NativeBiometric.getSecureData({
+      key: PIN_KEY, reason: 'Open True', title: 'Open True',
+      subtitle: `Use ${label}`, negativeButtonText: 'Use my code',
+    });
+    return r.value ? { pin: r.value } : {};
+  } catch (e) {
+    if (String(e && e.code) === String(BiometricAuthError.NO_PROTECTED_CREDENTIALS_FOUND)) return { gone: true };
+    return {};
+  }
+}
+
+async function bioDisable() {
+  try { await NativeBiometric.deleteData({ key: PIN_KEY }); } catch {}
+}
+
+// ─── Daily check-in nudge ──────────────────────────────────────
+// One repeating local notification. Scheduled on the phone — no push
+// server, nothing leaves the device.
+const NUDGE_ID = 7001;
+
+async function nudgeSchedule(hour, minute, title, body) {
+  let perm = await LocalNotifications.checkPermissions();
+  if (perm.display !== 'granted') perm = await LocalNotifications.requestPermissions();
+  if (perm.display !== 'granted') return false;
+  await LocalNotifications.cancel({ notifications: [{ id: NUDGE_ID }] });
+  await LocalNotifications.schedule({
+    notifications: [{
+      id: NUDGE_ID, title, body,
+      schedule: { on: { hour, minute }, allowWhileIdle: true },
+      // A nudge can be a few minutes late. Exact alarms would send them to
+      // an "Alarms & reminders" settings screen, and Play restricts that
+      // permission to alarm/calendar apps.
+      isExactNotification: false,
+      smallIcon: 'ic_stat_true',
+    }],
+  });
+  return true;
+}
+
+async function nudgeCancel() {
+  try { await LocalNotifications.cancel({ notifications: [{ id: NUDGE_ID }] }); } catch {}
+}
+
+async function clearEverything() {
+  await clearAll();
+  await bioDisable();
+  await nudgeCancel();
+}
+
 window.TrueNative = {
   isNative: Capacitor.isNativePlatform(),
   platform: Capacitor.getPlatform(),
-  readState, writeState, clearAll,
+  readState, writeState, clearAll: clearEverything,
   mediaPut, mediaGet, mediaAll,
+  bioAvailable, bioEnable, bioGetPin, bioDisable,
+  nudgeSchedule, nudgeCancel,
 };

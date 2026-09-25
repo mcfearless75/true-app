@@ -799,6 +799,7 @@
       <div class="pin-key empty"></div><button class="pin-key" onclick="lockTap(0)">0</button><button class="pin-key del" onclick="lockDel()">⌫</button>
     </div>
     <div class="pin-hint" id="lock-hint">Enter your code</div>
+    <button class="btn-secondary btn-sm" id="bio-unlock-btn" onclick="bioUnlock()" style="display:none;margin-top:14px"></button>
     <div style="margin-top:16px;text-align:center">
       <button class="link-quiet" onclick="openForgot()" style="display:block;margin:0 auto 10px">Forgot your code?</button>
       <button class="link-quiet" onclick="openHelp()">Need to talk to someone right now?</button>
@@ -1139,6 +1140,28 @@
       <button class="btn-secondary btn-sm" id="stealth-btn" onclick="toggleStealth()"></button>
     </div>
 
+    <!-- App only (hidden on the web): biometric unlock + check-in nudge -->
+    <div class="card-soft" id="bio-card" style="display:none">
+      <div style="font-size:14px;color:var(--text);font-weight:600" id="bio-title">Unlock with Face ID</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.55;margin:6px 0 12px">
+        Open True with just your face or finger. Your code still works too. If anyone adds a new face or fingerprint to this phone, this switches itself off and you'll need your code.
+      </div>
+      <button class="btn-secondary btn-sm" id="bio-btn" onclick="toggleBio()"></button>
+      <div id="bio-msg" style="font-size:13px;color:var(--text2);margin-top:8px;display:none"></div>
+    </div>
+
+    <div class="card-soft" id="nudge-card" style="display:none">
+      <div style="font-size:14px;color:var(--text);font-weight:600">A nudge to check in</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.55;margin:6px 0 12px">
+        One quiet reminder a day. It never says anything about what you've written.
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="time" id="nudge-time" value="19:00" style="width:auto;flex:0 0 auto" onchange="nudgeTimeChanged()">
+        <button class="btn-secondary btn-sm" id="nudge-btn" onclick="toggleNudge()"></button>
+      </div>
+      <div id="nudge-msg" style="font-size:13px;color:var(--text2);margin-top:8px;display:none"></div>
+    </div>
+
     <div class="section-label">KEEPING IT SAFE</div>
     <div class="card-soft" id="backup-invite-me" style="display:none">
       <div style="font-size:14px;color:var(--text);font-weight:600">Phones get lost</div>
@@ -1469,6 +1492,7 @@ function toggleStealth() {
   S.stealth = !S.stealth;
   applyStealth();
   saveState();
+  if (S.nudgeOn) applyNudge();   // the nudge's wording follows the disguise
 }
 
 function offerBackupOnce() {
@@ -1639,6 +1663,7 @@ function stateMeta() {
     // Locked after a restart, S has no name — keep the hint we already had
     nameHint: S.stealth ? '' : (S.name || (pendingEnc && pendingEnc.nameHint) || ''),
     pinRescue: S.pinRescue || null,
+    bioOn: !!S.bioOn,             // the lock screen needs this before unlock
   };
 }
 
@@ -1716,6 +1741,7 @@ function loadState() {
       S.pinLockUntil = saved.pinLockUntil || 0;
       S.stealth = !!saved.stealth;
       S.pinRescue = saved.pinRescue || null;
+      S.bioOn = !!saved.bioOn;
       pendingEnc = saved;
       return;
     }
@@ -1766,6 +1792,7 @@ function lockMemory() {
     backupLast: S.backupLast,
     backupOffered: S.backupOffered,
     pinRescue: S.pinRescue,
+    bioOn: S.bioOn,
   };
   sessionKey = null;
   sessionPin = null;
@@ -1801,6 +1828,8 @@ async function setPin(pin) {
   S.pinHash = await hashPin(pin, S.pinSalt);
   S.pin = '';
   S.pinRescue = null;             // sealed the old code — reseal below
+  // Quick unlock holds the old code; a new code means switching it on again
+  if (S.bioOn) { S.bioOn = false; if (NATIVE) window.TrueNative.bioDisable(); }
   sessionPin = pin;
   sessionKey = await deriveSessionKey(pin, S.pinSalt);
   const ok = await saveState();
@@ -1943,20 +1972,7 @@ function lockTap(n) {
     setTimeout(async () => {
       const pin = lockEntry.join('');
       if (await verifyPin(pin)) {
-        const opened = await openEncryptedState(pin);
-        if (!opened) {
-          document.getElementById('lock-hint').textContent = 'Could not open your story — try again';
-          lockEntry = [];
-          updateLockDots();
-          return;
-        }
-        S.pinFails = 0;
-        S.pinLockUntil = 0;
-        sessionPin = pin;
-        await saveState();
-        unlock();
-        // Installs from before PIN rescue get sealed on their next unlock
-        if (S.backupCode && !S.pinRescue) refreshPinRescue();
+        await openWithPin(pin);
       } else {
         S.pinFails = (S.pinFails || 0) + 1;
         let hint = 'Incorrect code — try again';
@@ -1972,6 +1988,146 @@ function lockTap(n) {
       }
     }, 300);
   }
+}
+
+// A verified PIN — typed, or handed back by Face ID / fingerprint
+async function openWithPin(pin) {
+  const opened = await openEncryptedState(pin);
+  if (!opened) {
+    document.getElementById('lock-hint').textContent = 'Could not open your story — try again';
+    lockEntry = [];
+    updateLockDots();
+    return false;
+  }
+  S.pinFails = 0;
+  S.pinLockUntil = 0;
+  sessionPin = pin;
+  await saveState();
+  unlock();
+  // Installs from before PIN rescue get sealed on their next unlock
+  if (S.backupCode && !S.pinRescue) refreshPinRescue();
+  return true;
+}
+
+// ─── Face ID / fingerprint (app only) ─────────────────────────
+let bioLabelText = '';
+let bioPrompting = false;
+
+async function showBioUnlock(autoPrompt) {
+  const btn = document.getElementById('bio-unlock-btn');
+  if (!NATIVE || !S.bioOn) { btn.style.display = 'none'; return; }
+  const { available, label } = await window.TrueNative.bioAvailable();
+  if (!available) { btn.style.display = 'none'; return; }
+  bioLabelText = label;
+  btn.textContent = 'Use ' + label;
+  btn.style.display = 'inline-block';
+  if (autoPrompt) bioUnlock();   // cancelling just falls back to the keypad
+}
+
+// Coming back to a locked app: offer the face/finger straight away
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible' || !NATIVE || !S.bioOn) return;
+  if (document.getElementById('lock-screen').classList.contains('hidden')) return;
+  showBioUnlock(true);
+});
+
+async function bioUnlock() {
+  if (bioPrompting) return;
+  bioPrompting = true;
+  try {
+    const { pin, gone } = await window.TrueNative.bioGetPin(bioLabelText);
+    if (pin && await verifyPin(pin)) { await openWithPin(pin); return; }
+    if (!gone && !pin) return;   // cancelled — the keypad is right there
+    // The phone wiped it (someone added a face or finger), or it's stale.
+    // Stop offering it and say why, so it doesn't just look broken.
+    S.bioOn = false;
+    saveState();
+    window.TrueNative.bioDisable();
+    document.getElementById('bio-unlock-btn').style.display = 'none';
+    document.getElementById('lock-hint').textContent =
+      'The faces or fingerprints on this phone changed, so quick unlock switched itself off. Use your code — you can turn it back on in About Me.';
+  } finally {
+    bioPrompting = false;
+  }
+}
+
+async function toggleBio() {
+  const msg = document.getElementById('bio-msg');
+  msg.style.display = 'none';
+  if (S.bioOn) {
+    await window.TrueNative.bioDisable();
+    S.bioOn = false;
+  } else {
+    if (!sessionPin) {   // can only happen if unlocked some other way
+      msg.style.display = 'block';
+      msg.textContent = 'Lock and unlock with your code first, then try again.';
+      return;
+    }
+    try {
+      await window.TrueNative.bioEnable(sessionPin);
+      S.bioOn = true;
+    } catch (e) {
+      msg.style.display = 'block';
+      msg.textContent = "That didn't work — nothing's changed. Your code still opens True.";
+    }
+  }
+  await saveState();
+  renderAppSettings();
+}
+
+// ─── Daily nudge (app only) ───────────────────────────────────
+// Deliberately says nothing about what's inside — it shows on a lock
+// screen anyone might see. In "look like notes" mode it's plainer still.
+function nudgeText() {
+  return S.stealth
+    ? { title: 'Notes', body: 'Reminder' }
+    : { title: 'True', body: 'Got a minute for yourself?' };
+}
+
+async function applyNudge() {
+  if (!NATIVE) return true;
+  if (!S.nudgeOn) { await window.TrueNative.nudgeCancel(); return true; }
+  const [h, m] = (S.nudgeTime || '19:00').split(':').map(Number);
+  const t = nudgeText();
+  return window.TrueNative.nudgeSchedule(h, m, t.title, t.body);
+}
+
+async function toggleNudge() {
+  const msg = document.getElementById('nudge-msg');
+  msg.style.display = 'none';
+  S.nudgeOn = !S.nudgeOn;
+  S.nudgeTime = document.getElementById('nudge-time').value || '19:00';
+  const ok = await applyNudge();
+  if (!ok) {
+    S.nudgeOn = false;
+    msg.style.display = 'block';
+    msg.textContent = "Notifications are off for True in your phone's settings. Turn them on there if you'd like the nudge.";
+  }
+  await saveState();
+  renderAppSettings();
+}
+
+async function nudgeTimeChanged() {
+  S.nudgeTime = document.getElementById('nudge-time').value || '19:00';
+  await saveState();
+  if (S.nudgeOn) applyNudge();
+}
+
+async function renderAppSettings() {
+  if (!NATIVE) return;
+  const bioCard = document.getElementById('bio-card');
+  const { available, label } = await window.TrueNative.bioAvailable();
+  // Only offered when the phone has a face or finger set up
+  bioCard.style.display = (available || S.bioOn) ? 'block' : 'none';
+  if (label) {
+    document.getElementById('bio-title').textContent = 'Unlock with ' + label;
+    bioLabelText = label;
+  }
+  document.getElementById('bio-btn').textContent = S.bioOn ? 'Turn off' : 'Turn on';
+
+  document.getElementById('nudge-card').style.display = 'block';
+  document.getElementById('nudge-time').value = S.nudgeTime || '19:00';
+  document.getElementById('nudge-btn').textContent = S.nudgeOn ? 'Turn off' : 'Turn on';
 }
 
 function lockDel() { lockEntry.pop(); updateLockDots(); }
@@ -2003,6 +2159,7 @@ async function doLock() {
   freezeShell(true);
   lockEntry = [];
   updateLockDots();
+  showBioUnlock(false);   // they just locked it — offer, don't pop up
 }
 
 // ─── Navigation ───────────────────────────────────────────────
@@ -2183,6 +2340,7 @@ function renderMe() {
   renderBackupCard();
   renderVaultCards();
   applyStealth();
+  renderAppSettings();
   const invite = document.getElementById('backup-invite-me');
   if (invite) invite.style.display = (S.backupCode || !S.backupOffered) ? 'none' : 'block';
 }
@@ -3497,6 +3655,7 @@ async function boot() {
     const hintName = S.stealth ? '' : (S.name || '');
     document.getElementById('lock-hint').textContent = hintName ? `Welcome back, ${hintName} — enter your code` : 'Enter your code';
     freezeShell(true);
+    showBioUnlock(true);
     return;
   }
 
