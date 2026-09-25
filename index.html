@@ -764,7 +764,7 @@
     <!-- Step 4: PIN setup -->
     <div class="ob-step" id="ob-4">
       <div class="ob-title">Create your lock code.</div>
-      <div class="ob-sub">4 digits. Only you will know it. If you forget it, you'll need to reset the app.</div>
+      <div class="ob-sub">4 digits. Only you will know it. If you forget it, the recovery code from backup gets you back in — so it's worth turning backup on.</div>
       <div class="pin-dots" id="ob-dots" style="justify-content:center;margin-bottom:24px">
         <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
       </div>
@@ -800,6 +800,7 @@
     </div>
     <div class="pin-hint" id="lock-hint">Enter your code</div>
     <div style="margin-top:16px;text-align:center">
+      <button class="link-quiet" onclick="openForgot()" style="display:block;margin:0 auto 10px">Forgot your code?</button>
       <button class="link-quiet" onclick="openHelp()">Need to talk to someone right now?</button>
       <div style="font-size:11px;color:var(--text3);margin-top:6px">Opens help without unlocking your words</div>
     </div>
@@ -913,6 +914,60 @@
       <div id="restore-msg" style="font-size:13px;color:var(--text2);margin-top:10px;text-align:center;display:none"></div>
       <div style="text-align:center;margin-top:14px">
         <button class="link-quiet" onclick="closeRestore()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FORGOT YOUR CODE — the recovery code proves it's theirs, then a new
+       lock code. No adult, no server: everything is checked on this phone.
+       Also used after a restore, so a new device never inherits a code the
+       young person may have forgotten. -->
+  <div class="overlay" id="forgot-overlay">
+    <div class="overlay-card">
+      <!-- Has a recovery code on this phone -->
+      <div id="fg-code" style="display:none">
+        <div class="page-title" style="font-size:20px">Forgot your code?</div>
+        <div style="font-size:14px;color:var(--text2);line-height:1.6;margin:8px 0 14px">
+          That's OK. If you turned on backup, enter the recovery code you saved, then choose a new lock code.
+        </div>
+        <input type="text" id="fg-code-input" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX" autocapitalize="characters" autocomplete="off" spellcheck="false" style="text-align:center;letter-spacing:0.06em;font-weight:600;margin-bottom:12px">
+        <button class="btn-primary" style="width:100%" id="fg-code-btn" onclick="checkForgotCode()">Continue</button>
+        <div id="fg-code-msg" style="font-size:13px;color:var(--text2);margin-top:10px;text-align:center;display:none"></div>
+        <div style="text-align:center;margin-top:12px">
+          <button class="link-quiet" onclick="fgShow('fg-none')">I don't have a recovery code</button>
+        </div>
+      </div>
+
+      <!-- No recovery code — say plainly what that means -->
+      <div id="fg-none" style="display:none">
+        <div class="page-title" style="font-size:20px">No recovery code?</div>
+        <div style="font-size:14px;color:var(--text2);line-height:1.6;margin:8px 0 14px">
+          Then nobody can unlock True on this phone — not us, not anyone. That's what keeps your words safe if someone else picks it up.
+        </div>
+        <div style="font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:14px">
+          Take your time trying to remember. If you can't, you can start fresh, but <strong>everything on this phone will be gone</strong> and can't come back.
+        </div>
+        <button class="btn-secondary" style="width:100%;color:var(--warn)" onclick="startFresh()">Start fresh</button>
+      </div>
+
+      <!-- New code, entered twice -->
+      <div id="fg-pin" style="display:none">
+        <div class="page-title" style="font-size:20px" id="fg-pin-title">Choose a new code</div>
+        <div style="font-size:14px;color:var(--text2);line-height:1.6;margin:8px 0 18px" id="fg-pin-sub">4 digits. Only you will know it.</div>
+        <div class="pin-dots" id="fg-dots" style="justify-content:center;margin-bottom:20px">
+          <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+        </div>
+        <div class="pin-grid" style="margin:0 auto 14px">
+          <button class="pin-key" onclick="fgPin(1)">1</button><button class="pin-key" onclick="fgPin(2)">2</button><button class="pin-key" onclick="fgPin(3)">3</button>
+          <button class="pin-key" onclick="fgPin(4)">4</button><button class="pin-key" onclick="fgPin(5)">5</button><button class="pin-key" onclick="fgPin(6)">6</button>
+          <button class="pin-key" onclick="fgPin(7)">7</button><button class="pin-key" onclick="fgPin(8)">8</button><button class="pin-key" onclick="fgPin(9)">9</button>
+          <div class="pin-key empty"></div><button class="pin-key" onclick="fgPin(0)">0</button><button class="pin-key del" onclick="fgPinDel()">⌫</button>
+        </div>
+        <div class="pin-hint" id="fg-pin-hint">Enter your new code</div>
+      </div>
+
+      <div style="text-align:center;margin-top:14px" id="fg-close">
+        <button class="link-quiet" onclick="closeForgot()">Back</button>
       </div>
     </div>
   </div>
@@ -1572,6 +1627,7 @@ function stateMeta() {
     pinLockUntil: S.pinLockUntil || 0,
     stealth: !!S.stealth,
     nameHint: S.stealth ? '' : (S.name || ''),
+    pinRescue: S.pinRescue || null,
   };
 }
 
@@ -1634,6 +1690,7 @@ function loadState() {
       S.pinFails = saved.pinFails || 0;
       S.pinLockUntil = saved.pinLockUntil || 0;
       S.stealth = !!saved.stealth;
+      S.pinRescue = saved.pinRescue || null;
       pendingEnc = saved;
       return;
     }
@@ -1677,8 +1734,10 @@ function lockMemory() {
     backupCode: S.backupCode,
     backupLast: S.backupLast,
     backupOffered: S.backupOffered,
+    pinRescue: S.pinRescue,
   };
   sessionKey = null;
+  sessionPin = null;
   S = Object.assign({
     name: '', age: '', pin: '', pinHash: '', pinSalt: '', pinFails: 0, pinLockUntil: 0,
     promptIndex: 0, selectedMoodVal: null, selectedMoodLabel: null, selectedMsCat: null,
@@ -1710,8 +1769,44 @@ async function setPin(pin) {
   S.pinSalt = randomSalt();
   S.pinHash = await hashPin(pin, S.pinSalt);
   S.pin = '';
+  S.pinRescue = null;             // sealed the old code — reseal below
+  sessionPin = pin;
   sessionKey = await deriveSessionKey(pin, S.pinSalt);
-  await saveState();
+  const ok = await saveState();
+  await refreshPinRescue();
+  return ok;
+}
+
+// ─── PIN rescue ───────────────────────────────────────────────
+// The story is encrypted with a key from the PIN, so a forgotten PIN would
+// strand it. When backup is on, the PIN is also sealed with the recovery
+// code and kept next to the ciphertext. The recovery code (~98 bits) is far
+// stronger than the 4 digits it protects, so this adds no weak point — it
+// just means the one thing only they were given can still open the door.
+let sessionPin = null;          // in RAM only while unlocked, like sessionKey
+
+async function refreshPinRescue() {
+  if (!S.backupCode || !sessionPin || !(crypto.subtle && crypto.subtle.encrypt)) {
+    if (!S.backupCode && S.pinRescue) { S.pinRescue = null; await saveState(); }
+    return;
+  }
+  try {
+    const { key } = await deriveBackupMaterial(S.backupCode);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const buf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(sessionPin));
+    S.pinRescue = { iv: b64enc(iv), data: b64enc(buf) };
+    await saveState();
+  } catch (e) {}
+}
+
+async function openPinRescue(key) {
+  if (!S.pinRescue) return null;
+  try {
+    const plain = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: b64dec(S.pinRescue.iv) }, key, b64dec(S.pinRescue.data)
+    );
+    return new TextDecoder().decode(plain);
+  } catch (e) { return null; }   // wrong recovery code
 }
 
 async function verifyPin(pin) {
@@ -1826,8 +1921,11 @@ function lockTap(n) {
         }
         S.pinFails = 0;
         S.pinLockUntil = 0;
+        sessionPin = pin;
         await saveState();
         unlock();
+        // Installs from before PIN rescue get sealed on their next unlock
+        if (S.backupCode && !S.pinRescue) refreshPinRescue();
       } else {
         S.pinFails = (S.pinFails || 0) + 1;
         let hint = 'Incorrect code — try again';
@@ -2424,6 +2522,7 @@ function enableBackup() {
   saveState();
   document.getElementById('code-display').textContent = S.backupCode;
   document.getElementById('code-overlay').classList.add('open');
+  refreshPinRescue();
 }
 
 function showBackupCode() {
@@ -2466,11 +2565,184 @@ async function disableBackup() {
   S.backupCode = '';
   S.backupLast = 0;
   S.backupSkipped = [];
+  S.pinRescue = null;
   saveState();
   renderBackupCard();
 }
 
+// ─── Forgot your code ─────────────────────────────────────────
+// The recovery code is the proof — it's the one thing only the young person
+// was given. First choice: open the PIN rescue on this phone (offline,
+// nothing lost). Fallback for installs that were never sealed: pull the
+// encrypted backup. No adult, no account, no one else.
+let fgEntry = [], fgConfirm = [], fgStep = 1;
+let fgOnDone = null;   // what happens once a new code is confirmed
+
+function fgShow(pane) {
+  ['fg-code', 'fg-none', 'fg-pin'].forEach(id => {
+    document.getElementById(id).style.display = id === pane ? 'block' : 'none';
+  });
+}
+
+function openForgot() {
+  document.getElementById('fg-code-input').value = '';
+  document.getElementById('fg-code-msg').style.display = 'none';
+  document.getElementById('fg-close').style.display = 'block';
+  fgShow('fg-code');
+  document.getElementById('forgot-overlay').classList.add('open');
+}
+
+function closeForgot() {
+  document.getElementById('forgot-overlay').classList.remove('open');
+  fgEntry = []; fgConfirm = []; fgStep = 1; fgOnDone = null;
+}
+
+async function checkForgotCode() {
+  const msg = document.getElementById('fg-code-msg');
+  const btn = document.getElementById('fg-code-btn');
+  const typed = normaliseCode(document.getElementById('fg-code-input').value);
+  msg.style.display = 'block';
+  if (typed.length !== 20) {
+    msg.textContent = 'That code doesn\'t look complete — it has 20 letters and numbers.';
+    return;
+  }
+  btn.disabled = true;
+  msg.textContent = 'Checking…';
+  try {
+    const { key } = await deriveBackupMaterial(typed);
+
+    // 1. On this phone: the sealed PIN opens the story exactly as it is
+    const oldPin = await openPinRescue(key);
+    if (oldPin && await verifyPin(oldPin) && await openEncryptedState(oldPin)) {
+      askNewPin({
+        title: 'Choose a new code',
+        sub: '4 digits. Only you will know it.',
+        canCancel: false,
+        onDone: async pin => {
+          S.pinFails = 0;
+          S.pinLockUntil = 0;
+          await setPin(pin);
+          closeForgot();
+          unlock();
+        },
+      });
+      return;
+    }
+
+    // 2. Not sealed here (or a stale seal): bring the backup back instead
+    const { payload, updated } = await fetchBackup(typed);
+    applyRestore(payload, updated);
+  } catch (e) {
+    msg.textContent = e.message === 'notfound'
+      ? 'That code doesn\'t match this phone or any backup — check it carefully and try again.'
+      : e.message === 'server' || e instanceof TypeError
+        ? 'Couldn\'t reach your backup — check you\'re online and try again.'
+        : 'That didn\'t work — check the code and try again.';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function askNewPin({ title, sub, canCancel, onDone }) {
+  document.getElementById('fg-pin-title').textContent = title;
+  document.getElementById('fg-pin-sub').textContent = sub;
+  document.getElementById('fg-pin-hint').textContent = 'Enter your new code';
+  document.getElementById('fg-close').style.display = canCancel ? 'block' : 'none';
+  fgEntry = []; fgConfirm = []; fgStep = 1;
+  fgOnDone = onDone;
+  updateFgDots();
+  fgShow('fg-pin');
+  document.getElementById('forgot-overlay').classList.add('open');
+}
+
+function fgPin(n) {
+  const entry = fgStep === 1 ? fgEntry : fgConfirm;
+  if (entry.length >= 4) return;
+  entry.push(n);
+  updateFgDots();
+  if (entry.length < 4) return;
+  setTimeout(async () => {
+    if (fgStep === 1) {
+      fgStep = 2;
+      updateFgDots();
+      document.getElementById('fg-pin-hint').textContent = 'Enter it again to confirm';
+    } else if (fgEntry.join('') === fgConfirm.join('')) {
+      await fgOnDone(fgConfirm.join(''));
+    } else {
+      fgEntry = []; fgConfirm = []; fgStep = 1;
+      updateFgDots();
+      document.getElementById('fg-pin-hint').textContent = "Codes didn't match — try again";
+    }
+  }, 300);
+}
+
+function fgPinDel() {
+  (fgStep === 1 ? fgEntry : fgConfirm).pop();
+  updateFgDots();
+}
+
+function updateFgDots() {
+  const entry = fgStep === 1 ? fgEntry : fgConfirm;
+  document.querySelectorAll('#fg-dots .pin-dot').forEach((d, i) => d.classList.toggle('filled', i < entry.length));
+}
+
+// No recovery code means no way in — that's the privacy promise. Starting
+// fresh is the young person's own call, and it has to say exactly what it costs.
+async function startFresh() {
+  if (!confirm("This deletes everything in True on this phone — every check-in, journal entry, letter and photo. It can't be undone.\n\nStart fresh?")) return;
+  try { localStorage.removeItem('true_state'); } catch (e) {}
+  try { if (_mediaDb) _mediaDb.close(); } catch (e) {}
+  await new Promise(resolve => {
+    try {
+      const req = indexedDB.deleteDatabase('true_media');
+      req.onsuccess = req.onerror = req.onblocked = () => resolve();
+    } catch (e) { resolve(); }
+  });
+  location.reload();
+}
+
 // ─── Restore on a new device ──────────────────────────────────
+async function fetchBackup(code) {
+  const { id, key } = await deriveBackupMaterial(code);
+  const r = await fetch('/.netlify/functions/backup?id=' + id);
+  if (r.status === 404) throw new Error('notfound');
+  if (!r.ok) throw new Error('server');
+  const rec = await r.json();
+  const plainBuf = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: new Uint8Array(b64ToBuf(rec.iv)) }, key, b64ToBuf(rec.data)
+  );
+  const payload = JSON.parse(new TextDecoder().decode(plainBuf));
+  if (!payload || payload.v !== 1 || !payload.state) throw new Error('corrupt');
+  return { payload, updated: rec.updated || 0 };
+}
+
+async function applyRestore(payload, updated) {
+  // media back into IndexedDB first, then state, then a clean boot
+  for (const m of (payload.media || [])) {
+    try { await mediaPut({ id: m.id, kind: m.kind, type: m.type, blob: dataUrlToBlob(m.dataUrl) }); } catch (e) {}
+  }
+  // The backup carries the old lock code. Someone restoring may be here
+  // precisely because they forgot it, so a restored phone always gets a new one.
+  const state = payload.state;
+  delete state.pin;
+  state.pinHash = ''; state.pinSalt = ''; state.pinFails = 0; state.pinLockUntil = 0; state.pinRescue = null;
+  const when = updated
+    ? ' Your backup is from ' + new Date(updated).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + '.'
+    : '';
+  askNewPin({
+    title: 'Welcome back',
+    sub: 'Choose a lock code for this phone. It can be the same as before.' + when,
+    canCancel: false,
+    onDone: async pin => {
+      pendingEnc = null;
+      S = Object.assign(S, state);
+      // encrypts under the new code and reseals the rescue
+      if (!(await setPin(pin))) return;   // save warning is showing — don't reload it away
+      location.reload();
+    },
+  });
+}
+
 function openRestore()  { document.getElementById('restore-overlay').classList.add('open'); }
 function closeRestore() { document.getElementById('restore-overlay').classList.remove('open'); }
 
@@ -2487,23 +2759,9 @@ async function doRestore() {
   msg.style.display = 'block';
   msg.textContent = 'Unlocking…';
   try {
-    const { id, key } = await deriveBackupMaterial(raw);
-    const r = await fetch('/.netlify/functions/backup?id=' + id);
-    if (r.status === 404) throw new Error('notfound');
-    if (!r.ok) throw new Error('server');
-    const rec = await r.json();
-    const plainBuf = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: new Uint8Array(b64ToBuf(rec.iv)) }, key, b64ToBuf(rec.data)
-    );
-    const payload = JSON.parse(new TextDecoder().decode(plainBuf));
-    if (!payload || payload.v !== 1 || !payload.state) throw new Error('corrupt');
-    // media back into IndexedDB first, then state, then a clean boot
-    for (const m of (payload.media || [])) {
-      try { await mediaPut({ id: m.id, kind: m.kind, type: m.type, blob: dataUrlToBlob(m.dataUrl) }); } catch (e) {}
-    }
-    localStorage.setItem('true_state', JSON.stringify(payload.state));
-    msg.textContent = 'Got it. Welcome back.';
-    setTimeout(() => location.reload(), 900);
+    const { payload, updated } = await fetchBackup(raw);
+    closeRestore();
+    applyRestore(payload, updated);
   } catch (e) {
     btn.disabled = false;
     msg.textContent = e.message === 'notfound'
