@@ -899,6 +899,7 @@
       <div style="font-size:14px;color:var(--text2);line-height:1.6;margin:8px 0 14px">
         This code is the <strong>only</strong> key to your backup. Write it down or save it somewhere safe —
         without it, nobody can bring your story back. Not even us. That's the point.
+        <br><br><strong>Anyone who has this code can open your story on their own phone.</strong> Don't share it — not with a friend, not with a carer. If someone sees it, get a new one in About Me.
       </div>
       <div class="card-soft" style="text-align:center;font-size:17px;font-weight:700;letter-spacing:0.06em;color:var(--trdark);user-select:all" id="code-display"></div>
       <div style="display:flex;gap:8px;margin-top:14px">
@@ -1201,6 +1202,7 @@
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn-secondary" onclick="doBackup(true)">Back up now</button>
           <button class="btn-secondary" onclick="showBackupCode()">Show my code</button>
+          <button class="btn-secondary" onclick="replaceBackupCode()">Get a new code</button>
           <button class="btn-secondary" onclick="disableBackup()">Turn off</button>
         </div>
       </div>
@@ -2664,8 +2666,9 @@ function dataUrlToBlob(u) {
   return new Blob([b64ToBuf(b64)], { type: mime });
 }
 
+// Resolves true only when the server confirmed the new copy
 async function doBackup(manual) {
-  if (!S.backupCode || !navigator.onLine) return;
+  if (!S.backupCode || !navigator.onLine) return false;
   const statusEl = document.getElementById('backup-status');
   try {
     if (manual && statusEl) statusEl.textContent = 'Backing up…';
@@ -2684,9 +2687,53 @@ async function doBackup(manual) {
     saveState();
     backupDirty = false;
     renderBackupCard();
+    // A replaced code whose old copy couldn't be deleted at the time
+    if (S.staleBackupCode && await deleteBackupFor(S.staleBackupCode)) {
+      delete S.staleBackupCode;
+      saveState();
+    }
+    return true;
   } catch (e) {
     if (manual && statusEl) statusEl.textContent = "Couldn't back up just now — it'll retry on its own.";
+    return false;
   }
+}
+
+async function deleteBackupFor(code) {
+  try {
+    const { id } = await deriveBackupMaterial(code);
+    const r = await fetch(BACKUP_URL + '?id=' + id, { method: 'DELETE' });
+    return r.ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Someone saw the recovery code? Swap it. The new backup goes up first,
+// so there's never a moment without one; then the old copy is deleted.
+// If that delete can't happen now, it's retried after the next backup.
+async function replaceBackupCode() {
+  if (!navigator.onLine) {
+    alert("You need signal to change your code. Nothing has changed — your current code still works.");
+    return;
+  }
+  if (!confirm("Get a new recovery code?\n\nYour old code will stop working, and the copy it opens is deleted. You'll need to save the new one.")) return;
+  const oldCode = S.backupCode;
+  S.backupCode = generateRecoveryCode();
+  if (!(await doBackup(true))) {
+    S.backupCode = oldCode;
+    await saveState();
+    renderBackupCard();
+    alert("Couldn't reach the backup just now, so nothing has changed — your old code still works. Try again when you've got signal.");
+    return;
+  }
+  S.pinRescue = null;
+  await refreshPinRescue();   // "Forgot your code?" now takes the new one
+  if (!(await deleteBackupFor(oldCode))) {
+    S.staleBackupCode = oldCode;
+    await saveState();
+  }
+  showBackupCode();
 }
 
 const BACKUP_STALE_MS = 3 * 86400000;
@@ -2769,6 +2816,8 @@ async function disableBackup() {
     alert("Couldn't reach the server just now, so nothing has changed — your backup is still on. Try again when you've got signal, so we can be certain the scrambled copy is really gone.");
     return;
   }
+  // A replaced code's copy that never got deleted goes too
+  if (S.staleBackupCode && await deleteBackupFor(S.staleBackupCode)) delete S.staleBackupCode;
   S.backupCode = '';
   S.backupLast = 0;
   S.backupSkipped = [];

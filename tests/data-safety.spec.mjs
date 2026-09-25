@@ -296,6 +296,47 @@ test('after a restart the lock screen greets them by name, unless True looks lik
   expect(JSON.stringify(await saved(page))).not.toContain('Sam');
 });
 
+test('a new recovery code locks out the old one, and the new one works everywhere', async ({ page }) => {
+  const server = fakeBackupServer();
+  await server.attach(page);
+  const oldCode = await newAccount(page, { backup: true });
+  page.on('dialog', d => d.accept());
+  await page.evaluate(() => replaceBackupCode());
+  const newCode = await page.evaluate(() => S.backupCode);
+  expect(newCode).not.toBe(oldCode);
+  await expect(page.locator('#code-display')).toHaveText(newCode);
+  expect(server.store.size).toBe(1);   // old copy deleted, new one there
+
+  // the old code opens nothing, on any phone
+  const restoreWith = async code => page.evaluate(async code => {
+    try { await fetchBackup(code); return 'opened'; } catch (e) { return e.message; }
+  }, code);
+  expect(await restoreWith(oldCode)).toBe('notfound');
+  expect(await restoreWith(newCode)).toBe('opened');
+
+  // and "Forgot your code?" takes the new one, offline
+  await page.evaluate(() => document.getElementById('code-overlay').classList.remove('open'));
+  await page.locator('#header .lock-btn').click();
+  await page.reload();
+  await server.attach(page);
+  await page.getByRole('button', { name: 'Forgot your code?' }).click();
+  await page.locator('#fg-code-input').fill(newCode);
+  await page.locator('#fg-code-btn').click();
+  await expect(page.locator('#fg-pin')).toBeVisible({ timeout: 30_000 });
+});
+
+test('if the new code can\'t be backed up, nothing changes', async ({ page }) => {
+  const server = fakeBackupServer();
+  await server.attach(page);
+  const oldCode = await newAccount(page, { backup: true });
+  await page.route('**/.netlify/functions/backup**', r =>
+    r.request().method() === 'POST' ? r.fulfill({ status: 500 }) : r.fallback());
+  page.on('dialog', d => d.accept());
+  await page.evaluate(() => replaceBackupCode());
+  expect(await page.evaluate(() => S.backupCode)).toBe(oldCode);
+  expect(server.store.size).toBe(1);   // the old copy is still there
+});
+
 test('turning backup off deletes the online copy', async ({ page }) => {
   const server = fakeBackupServer();
   await server.attach(page);
