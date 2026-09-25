@@ -1610,6 +1610,15 @@ const DEMO_DATA = {
 };
 
 // ─── localStorage persistence ─────────────────────────────────
+// In the installed app (native.js present), the app's private folder is the
+// real copy and localStorage is only a mirror — the OS may clear WebView
+// storage, and the words can't be allowed to go with it.
+const NATIVE = !!(window.TrueNative && window.TrueNative.isNative);
+
+// The app isn't served from Netlify, so it needs the full address.
+const API_BASE = NATIVE ? 'https://true-app-beta.netlify.app' : '';
+const BACKUP_URL = API_BASE + '/.netlify/functions/backup';
+
 let backupDirty = false;
 
 // Returns false if the write didn't land. NEVER swallow this: a save that
@@ -1617,6 +1626,7 @@ let backupDirty = false;
 // is the worst thing this app could do.
 let sessionKey = null;          // AES key in RAM only, after a correct PIN
 let pendingEnc = null;          // v2 ciphertext waiting for unlock
+let lastEnc = null;             // newest ciphertext this session wrote
 
 function stateMeta() {
   return {
@@ -1661,12 +1671,19 @@ async function saveState() {
       const buf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, sessionKey, new TextEncoder().encode(JSON.stringify(S)));
       meta.iv = b64enc(iv);
       meta.data = b64enc(buf);
+      lastEnc = meta;
     } else {
       // First-run / no crypto: keep a readable copy so onboarding cannot strand them.
       meta.v = 1;
       meta.state = S;
     }
-    localStorage.setItem('true_state', JSON.stringify(meta));
+    const json = JSON.stringify(meta);
+    if (NATIVE) {
+      await window.TrueNative.writeState(json);          // the copy that counts
+      try { localStorage.setItem('true_state', json); } catch (e) {}
+    } else {
+      localStorage.setItem('true_state', json);
+    }
     backupDirty = true;
     hideSaveWarning();
     return true;
@@ -1722,6 +1739,12 @@ async function openEncryptedState(pin) {
 
 function lockMemory() {
   // Drop the story from RAM while locked. Meta stays so the PIN still works.
+  // The unlock reopens the ciphertext, so it must be waiting — without it,
+  // unlocking handed back an empty story and the next save wrote that
+  // emptiness over the real one. No ciphertext (no Web Crypto) means
+  // nothing to reopen, so the story stays in RAM rather than being lost.
+  if (!lastEnc) return;
+  pendingEnc = lastEnc;
   const meta = {
     name: S.stealth ? '' : S.name,
     age: S.age,
@@ -1964,7 +1987,8 @@ function unlock() {
 }
 
 async function doLock() {
-  await saveState();
+  // If the save didn't land, wiping RAM would lose it — stay open with the warning up
+  if (!(await saveState())) return;
   lockMemory();
   applyStealth();
   document.getElementById('lock-screen').classList.remove('hidden');
@@ -2466,7 +2490,7 @@ async function doBackup(manual) {
     const plaintext = new TextEncoder().encode(await buildBackupPayload());
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext);
-    const r = await fetch('/.netlify/functions/backup', {
+    const r = await fetch(BACKUP_URL, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ id, iv: bufToB64(iv.buffer), data: bufToB64(cipher) }),
@@ -2555,7 +2579,7 @@ async function disableBackup() {
   let deleted = false;
   try {
     const { id } = await deriveBackupMaterial(S.backupCode);
-    const r = await fetch('/.netlify/functions/backup?id=' + id, { method: 'DELETE' });
+    const r = await fetch(BACKUP_URL + '?id=' + id, { method: 'DELETE' });
     deleted = r.ok;
   } catch (e) {}
   if (!deleted) {
@@ -2691,6 +2715,7 @@ function updateFgDots() {
 async function startFresh() {
   if (!confirm("This deletes everything in True on this phone — every check-in, journal entry, letter and photo. It can't be undone.\n\nStart fresh?")) return;
   try { localStorage.removeItem('true_state'); } catch (e) {}
+  if (NATIVE) { try { await window.TrueNative.clearAll(); } catch (e) {} }
   try { if (_mediaDb) _mediaDb.close(); } catch (e) {}
   await new Promise(resolve => {
     try {
@@ -2704,7 +2729,7 @@ async function startFresh() {
 // ─── Restore on a new device ──────────────────────────────────
 async function fetchBackup(code) {
   const { id, key } = await deriveBackupMaterial(code);
-  const r = await fetch('/.netlify/functions/backup?id=' + id);
+  const r = await fetch(BACKUP_URL + '?id=' + id);
   if (r.status === 404) throw new Error('notfound');
   if (!r.ok) throw new Error('server');
   const rec = await r.json();
@@ -2788,7 +2813,24 @@ function mediaDb() {
   });
 }
 
+function blobToB64(blob) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(String(fr.result).split(',')[1] || '');
+    fr.onerror = () => reject(fr.error);
+    fr.readAsDataURL(blob);
+  });
+}
+
+// App: media files in the private folder, same record shape as IndexedDB
+function nativeMediaRec(r) {
+  return r && { id: r.id, kind: r.kind, type: r.type, blob: new Blob([b64ToBuf(r.data)], { type: r.type }) };
+}
+
 async function mediaPut(rec) {
+  if (NATIVE) {
+    return window.TrueNative.mediaPut({ id: rec.id, kind: rec.kind, type: rec.type, data: await blobToB64(rec.blob) });
+  }
   const db = await mediaDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction('media', 'readwrite');
@@ -2799,6 +2841,7 @@ async function mediaPut(rec) {
 }
 
 async function mediaGet(id) {
+  if (NATIVE) return nativeMediaRec(await window.TrueNative.mediaGet(id));
   const db = await mediaDb();
   return new Promise((resolve, reject) => {
     const rq = db.transaction('media').objectStore('media').get(id);
@@ -2808,6 +2851,7 @@ async function mediaGet(id) {
 }
 
 async function mediaAll() {
+  if (NATIVE) return (await window.TrueNative.mediaAll()).map(nativeMediaRec);
   const db = await mediaDb();
   return new Promise((resolve, reject) => {
     const rq = db.transaction('media').objectStore('media').getAll();
@@ -3411,6 +3455,14 @@ function initApp() {
 }
 
 async function boot() {
+  // App: the private-folder copy wins over whatever the WebView kept
+  if (NATIVE) {
+    try {
+      const saved = await window.TrueNative.readState();
+      if (saved) localStorage.setItem('true_state', saved);
+      else localStorage.removeItem('true_state');
+    } catch (e) {}
+  }
   loadState();
 
   // Demo mode — ?demo=1 loads a pre-populated example account
@@ -3449,7 +3501,8 @@ async function boot() {
 boot();
 </script>
 <script>
-if ('serviceWorker' in navigator) {
+// The app ships its files inside itself — offline caching is the web's job only
+if (!NATIVE && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 }
 </script>

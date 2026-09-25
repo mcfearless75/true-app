@@ -16,3 +16,6 @@ true-app/
 
 # Local Netlify folder
 .netlify
+
+# Built app bundle (npm run build:app)
+www/

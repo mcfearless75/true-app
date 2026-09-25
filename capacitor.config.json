@@ -1,0 +1,12 @@
+{
+  "appId": "uk.co.trueapp.app",
+  "appName": "True",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  },
+  "ios": {
+    "contentInset": "never",
+    "limitsNavigationsToAppBoundDomains": false
+  }
+}

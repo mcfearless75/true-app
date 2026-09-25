@@ -12,7 +12,32 @@ import { getStore } from '@netlify/blobs';
 const ID_RE = /^[0-9a-f]{32}$/;
 const MAX_CIPHERTEXT_CHARS = 6_000_000; // ~4.5MB binary — function payload ceiling
 
+// The installed app (Capacitor) isn't served from this site, so its calls
+// are cross-origin. Only the app's own origins are let in — iOS serves from
+// capacitor://localhost, Android from https://localhost. There are no
+// cookies or accounts here, so CORS guards nothing secret; it just keeps
+// other websites from using this as their storage.
+const APP_ORIGINS = new Set(['capacitor://localhost', 'https://localhost', 'http://localhost']);
+
+function corsHeaders(req) {
+  const origin = req.headers.get('origin');
+  if (!origin || !APP_ORIGINS.has(origin)) return {};
+  return {
+    'access-control-allow-origin': origin,
+    'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS',
+    'access-control-allow-headers': 'content-type',
+    'access-control-max-age': '86400',
+    vary: 'origin',
+  };
+}
+
 export default async (req) => {
+  const cors = corsHeaders(req);
+  const json = (body, init = {}) =>
+    Response.json(body, { ...init, headers: { ...cors, ...(init.headers || {}) } });
+
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+
   const store = getStore('true-backups');
   const url = new URL(req.url);
 
@@ -21,32 +46,32 @@ export default async (req) => {
     try {
       body = await req.json();
     } catch {
-      return Response.json({ error: 'bad_request' }, { status: 400 });
+      return json({ error: 'bad_request' }, { status: 400 });
     }
     const { id, iv, data } = body;
     if (!ID_RE.test(id || '') || typeof iv !== 'string' || iv.length > 64 ||
         typeof data !== 'string' || data.length === 0 || data.length > MAX_CIPHERTEXT_CHARS) {
-      return Response.json({ error: 'bad_request' }, { status: 400 });
+      return json({ error: 'bad_request' }, { status: 400 });
     }
     await store.setJSON(id, { iv, data, updated: Date.now() });
-    return Response.json({ ok: true });
+    return json({ ok: true });
   }
 
   const id = url.searchParams.get('id') || '';
   if (!ID_RE.test(id)) {
-    return Response.json({ error: 'bad_request' }, { status: 400 });
+    return json({ error: 'bad_request' }, { status: 400 });
   }
 
   if (req.method === 'GET') {
     const rec = await store.get(id, { type: 'json' });
-    if (!rec) return Response.json({ error: 'not_found' }, { status: 404 });
-    return Response.json(rec, { headers: { 'cache-control': 'no-store' } });
+    if (!rec) return json({ error: 'not_found' }, { status: 404 });
+    return json(rec, { headers: { 'cache-control': 'no-store' } });
   }
 
   if (req.method === 'DELETE') {
     await store.delete(id);
-    return Response.json({ ok: true });
+    return json({ ok: true });
   }
 
-  return new Response('Method not allowed', { status: 405 });
+  return new Response('Method not allowed', { status: 405, headers: cors });
 };
