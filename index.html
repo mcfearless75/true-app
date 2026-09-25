@@ -106,7 +106,12 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      background: transparent;
+      /* Sticky, so it needs a surface — transparent let the page scroll
+         visibly through the logo. Frosted where supported, solid otherwise. */
+      background: var(--bg);
+      background: color-mix(in srgb, var(--bg) 86%, transparent);
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
       position: sticky;
       top: 0;
       z-index: 5;
