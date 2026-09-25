@@ -1636,7 +1636,8 @@ function stateMeta() {
     pinFails: S.pinFails || 0,
     pinLockUntil: S.pinLockUntil || 0,
     stealth: !!S.stealth,
-    nameHint: S.stealth ? '' : (S.name || ''),
+    // Locked after a restart, S has no name — keep the hint we already had
+    nameHint: S.stealth ? '' : (S.name || (pendingEnc && pendingEnc.nameHint) || ''),
     pinRescue: S.pinRescue || null,
   };
 }
@@ -1672,6 +1673,13 @@ async function saveState() {
       meta.iv = b64enc(iv);
       meta.data = b64enc(buf);
       lastEnc = meta;
+    } else if (pendingEnc && pendingEnc.data) {
+      // Locked: the story is ciphertext we have no key for. Carry it over
+      // untouched and only update the lock-screen fields around it. Falling
+      // through to the branch below wrote the empty locked S over the real
+      // story — one mistyped PIN, then closing the app, lost everything.
+      meta.iv = pendingEnc.iv;
+      meta.data = pendingEnc.data;
     } else {
       // First-run / no crypto: keep a readable copy so onboarding cannot strand them.
       meta.v = 1;
