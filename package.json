@@ -4,7 +4,8 @@
   "scripts": {
     "build:app": "node scripts/build-www.mjs",
     "sync": "npm run build:app && npx cap sync",
-    "android": "npm run sync && npx cap open android"
+    "android": "npm run sync && npx cap open android",
+    "assets": "node scripts/make-app-assets.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",
@@ -16,6 +17,7 @@
     "@netlify/blobs": "^8.1.0"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.5.2",
     "esbuild": "^0.28.2"
   }
