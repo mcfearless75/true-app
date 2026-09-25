@@ -66,6 +66,25 @@ const unlockedStory = page => page.evaluate(() =>
 
 const saved = page => page.evaluate(() => JSON.parse(localStorage.getItem('true_state')));
 
+const PHOTO = 'PHOTO-BYTES-of-my-first-day-at-college';
+
+// A photo in the memory box, the way saveMilestone stores one
+const addPhoto = page => page.evaluate(async PHOTO => {
+  await mediaPut({ id: 'ph_1', kind: 'photo', type: 'image/png', blob: new Blob([PHOTO], { type: 'image/png' }) });
+}, PHOTO);
+
+// What the app can read (null when it can't open it)
+const readPhoto = page => page.evaluate(async () => {
+  const r = await mediaGet('ph_1');
+  return r ? r.blob.text() : null;
+});
+
+// What's actually sitting in storage
+const storedPhoto = page => page.evaluate(async () => {
+  const r = await mediaGetRaw('ph_1');
+  return r && { enc: !!r.enc, text: await r.blob.text() };
+});
+
 // ─────────────────────────────────────────────────────────────────────
 
 test('first run: onboarding through the real screens', async ({ page }) => {
@@ -178,6 +197,88 @@ test('new phone: restore brings the story back and asks for a new code', async (
   await expect(phone2.locator('#lock-hint')).toContainText('Incorrect');
   await typeOn(phone2, '#lock-screen', '7777');
   await expect.poll(() => unlockedStory(phone2)).toBe(SECRET);
+});
+
+test('photos and voice notes are encrypted on the phone, and locked when True is', async ({ page }) => {
+  await newAccount(page);
+  await addPhoto(page);
+  const stored = await storedPhoto(page);
+  expect(stored.enc).toBe(true);
+  expect(stored.text).not.toContain(PHOTO);
+  expect(await readPhoto(page)).toBe(PHOTO);
+
+  await page.locator('#header .lock-btn').click();
+  expect(await readPhoto(page)).toBeNull();   // locked: can't be opened
+
+  await page.reload();
+  await typeOn(page, '#lock-screen', PIN);
+  await expect.poll(() => unlockedStory(page)).toBe(SECRET);
+  expect(await readPhoto(page)).toBe(PHOTO);
+});
+
+test('photos saved before encryption get sealed on the next unlock', async ({ page }) => {
+  await newAccount(page);
+  await page.evaluate(async PHOTO => {   // how the old version stored them
+    await mediaPutRaw({ id: 'ph_1', kind: 'photo', type: 'image/png', blob: new Blob([PHOTO], { type: 'image/png' }) });
+  }, PHOTO);
+  expect((await storedPhoto(page)).enc).toBe(false);
+
+  await page.locator('#header .lock-btn').click();
+  await page.reload();
+  await typeOn(page, '#lock-screen', PIN);
+  await expect.poll(async () => (await storedPhoto(page)).enc).toBe(true);
+  expect((await storedPhoto(page)).text).not.toContain(PHOTO);
+  expect(await readPhoto(page)).toBe(PHOTO);
+});
+
+test('forgot code: photos still open after choosing a new code', async ({ page }) => {
+  const server = fakeBackupServer();
+  await server.attach(page);
+  const code = await newAccount(page, { backup: true });
+  await addPhoto(page);
+  await page.locator('#header .lock-btn').click();
+  await page.reload();
+  await server.attach(page);
+
+  await page.getByRole('button', { name: 'Forgot your code?' }).click();
+  await page.locator('#fg-code-input').fill(code);
+  await page.locator('#fg-code-btn').click();
+  await expect(page.locator('#fg-pin')).toBeVisible({ timeout: 30_000 });
+  await chooseCode(page, '#fg-pin', '#fg-pin-hint', '4444');
+  await expect.poll(() => unlockedStory(page), { timeout: 30_000 }).toBe(SECRET);
+  expect(await readPhoto(page)).toBe(PHOTO);
+
+  await page.reload();
+  await typeOn(page, '#lock-screen', '4444');
+  await expect.poll(() => unlockedStory(page)).toBe(SECRET);
+  expect(await readPhoto(page)).toBe(PHOTO);
+});
+
+test('new phone: photos come back from the backup, encrypted again', async ({ page, browser }) => {
+  const server = fakeBackupServer();
+  await server.attach(page);
+  const code = await newAccount(page, { backup: true });
+  await addPhoto(page);
+  await page.evaluate(() => doBackup(true));
+  for (const rec of server.store.values()) expect(JSON.stringify(rec)).not.toContain(PHOTO);
+
+  const phone2 = await (await browser.newContext({ serviceWorkers: 'block' })).newPage();
+  await server.attach(phone2);
+  await phone2.goto('/index.html');
+  await phone2.getByRole('button', { name: /I had True before/ }).click();
+  await phone2.locator('#restore-code').fill(code);
+  await phone2.locator('#restore-btn').click();
+  await expect(phone2.locator('#fg-pin-title')).toHaveText('Welcome back', { timeout: 30_000 });
+  const reloaded = phone2.waitForEvent('load', { timeout: 30_000 });
+  await chooseCode(phone2, '#fg-pin', '#fg-pin-hint', '7777');
+  await reloaded;
+  await typeOn(phone2, '#lock-screen', '7777');
+  await expect.poll(() => unlockedStory(phone2)).toBe(SECRET);
+
+  const stored = await storedPhoto(phone2);
+  expect(stored.enc).toBe(true);
+  expect(stored.text).not.toContain(PHOTO);
+  expect(await readPhoto(phone2)).toBe(PHOTO);
 });
 
 test('turning backup off deletes the online copy', async ({ page }) => {

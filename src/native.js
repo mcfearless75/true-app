@@ -65,11 +65,12 @@ function writeState(data) {
 }
 
 // ─── Media: one file for the bytes, one for what they are ─────
-async function mediaPut({ id, kind, type, data }) {
+// enc/iv: set when the bytes are encrypted (index.html does the crypto)
+async function mediaPut({ id, kind, type, enc, iv, data }) {
   await Filesystem.writeFile({ path: `${MEDIA}/${id}.bin`, directory: DIR, data, recursive: true });
   await Filesystem.writeFile({
     path: `${MEDIA}/${id}.json`, directory: DIR, encoding: Encoding.UTF8,
-    data: JSON.stringify({ id, kind, type }), recursive: true,
+    data: JSON.stringify({ id, kind, type, enc: enc || 0, iv: iv || '' }), recursive: true,
   });
 }
 

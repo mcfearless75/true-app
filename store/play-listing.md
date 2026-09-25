@@ -28,7 +28,7 @@ Check in with your mood in a few seconds. Write when you want to, with a prompt 
 
 Only you can open it
 • You choose a 4-digit code. Unlock with your fingerprint or face if you like.
-• Your words are encrypted on your phone with a key made from your code.
+• Your words, photos and voice notes are encrypted on your phone, locked by your code.
 • No accounts. No carer logins. No reports to anyone.
 • No ads, no tracking, and no AI reading what you write.
 • "Look like notes" changes the name on screen, so True is less obvious if someone picks up your phone.

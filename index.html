@@ -1801,6 +1801,7 @@ function lockMemory() {
   };
   sessionKey = null;
   sessionPin = null;
+  mediaCryptoKey = null;
   S = Object.assign({
     name: '', age: '', pin: '', pinHash: '', pinSalt: '', pinFails: 0, pinLockUntil: 0,
     promptIndex: 0, selectedMoodVal: null, selectedMoodLabel: null, selectedMsCat: null,
@@ -2011,6 +2012,8 @@ async function openWithPin(pin) {
   unlock();
   // Installs from before PIN rescue get sealed on their next unlock
   if (S.backupCode && !S.pinRescue) refreshPinRescue();
+  // ...and so do photos and voice notes from before media encryption
+  sealLooseMedia();
   return true;
 }
 
@@ -2913,10 +2916,6 @@ async function fetchBackup(code) {
 }
 
 async function applyRestore(payload, updated) {
-  // media back into IndexedDB first, then state, then a clean boot
-  for (const m of (payload.media || [])) {
-    try { await mediaPut({ id: m.id, kind: m.kind, type: m.type, blob: dataUrlToBlob(m.dataUrl) }); } catch (e) {}
-  }
   // The backup carries the old lock code. Someone restoring may be here
   // precisely because they forgot it, so a restored phone always gets a new one.
   const state = payload.state;
@@ -2931,9 +2930,15 @@ async function applyRestore(payload, updated) {
     canCancel: false,
     onDone: async pin => {
       pendingEnc = null;
+      mediaCryptoKey = null;
       S = Object.assign(S, state);
       // encrypts under the new code and reseals the rescue
       if (!(await setPin(pin))) return;   // save warning is showing — don't reload it away
+      // Media last: the story (and the media key inside it) must be in
+      // place first, so photos are encrypted as they come back
+      for (const m of (payload.media || [])) {
+        try { await mediaPut({ id: m.id, kind: m.kind, type: m.type, blob: dataUrlToBlob(m.dataUrl) }); } catch (e) {}
+      }
       location.reload();
     },
   });
@@ -2995,12 +3000,75 @@ function blobToB64(blob) {
 
 // App: media files in the private folder, same record shape as IndexedDB
 function nativeMediaRec(r) {
-  return r && { id: r.id, kind: r.kind, type: r.type, blob: new Blob([b64ToBuf(r.data)], { type: r.type }) };
+  return r && { id: r.id, kind: r.kind, type: r.type, enc: r.enc, iv: r.iv,
+    blob: new Blob([b64ToBuf(r.data)], { type: r.enc ? 'application/octet-stream' : r.type }) };
+}
+
+// ─── Media encryption ─────────────────────────────────────────
+// Photos and voice notes are encrypted with a random key that lives inside
+// the encrypted story (S.mediaKey), so they're exactly as locked as the
+// words. It isn't derived from the PIN: changing the code, or recovering
+// it, never has to re-encrypt every photo — which is where they'd get lost.
+let mediaCryptoKey = null;   // RAM only while unlocked, like sessionKey
+
+async function getMediaKey(create) {
+  if (mediaCryptoKey) return mediaCryptoKey;
+  if (!(crypto.subtle && crypto.subtle.importKey)) return null;
+  if (!S.mediaKey) {
+    if (!create || !sessionKey) return null;   // locked, or no encrypted story to keep it in
+    S.mediaKey = b64enc(crypto.getRandomValues(new Uint8Array(32)));
+    if (!(await saveState())) { delete S.mediaKey; return null; }
+  }
+  mediaCryptoKey = await crypto.subtle.importKey('raw', b64dec(S.mediaKey), 'AES-GCM', false, ['encrypt', 'decrypt']);
+  return mediaCryptoKey;
 }
 
 async function mediaPut(rec) {
+  const key = await getMediaKey(true);
+  if (key && !rec.enc) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const buf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, await rec.blob.arrayBuffer());
+    rec = { id: rec.id, kind: rec.kind, type: rec.type, enc: 1, iv: b64enc(iv),
+            blob: new Blob([buf], { type: 'application/octet-stream' }) };
+  }
+  return mediaPutRaw(rec);
+}
+
+// Stored record → plain record, or null if it can't be opened (locked)
+async function openMediaRec(rec) {
+  if (!rec || !rec.enc) return rec;
+  const key = await getMediaKey(false);
+  if (!key) return null;
+  try {
+    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64dec(rec.iv) }, key, await rec.blob.arrayBuffer());
+    return { id: rec.id, kind: rec.kind, type: rec.type, blob: new Blob([plain], { type: rec.type }) };
+  } catch (e) {
+    return null;
+  }
+}
+
+async function mediaGet(id) { return openMediaRec(await mediaGetRaw(id)); }
+
+async function mediaAll() {
+  const opened = await Promise.all((await mediaAllRaw()).map(openMediaRec));
+  return opened.filter(Boolean);
+}
+
+// Media saved before encryption existed gets sealed on the next unlock.
+// Put-then-overwrite by id, so an interrupted run just resumes next time.
+async function sealLooseMedia() {
+  try {
+    if (!(await getMediaKey(true))) return;
+    for (const rec of await mediaAllRaw()) {
+      if (!rec.enc && rec.blob) await mediaPut(rec);
+    }
+  } catch (e) {}
+}
+
+async function mediaPutRaw(rec) {
   if (NATIVE) {
-    return window.TrueNative.mediaPut({ id: rec.id, kind: rec.kind, type: rec.type, data: await blobToB64(rec.blob) });
+    return window.TrueNative.mediaPut({ id: rec.id, kind: rec.kind, type: rec.type,
+      enc: rec.enc, iv: rec.iv, data: await blobToB64(rec.blob) });
   }
   const db = await mediaDb();
   return new Promise((resolve, reject) => {
@@ -3011,7 +3079,7 @@ async function mediaPut(rec) {
   });
 }
 
-async function mediaGet(id) {
+async function mediaGetRaw(id) {
   if (NATIVE) return nativeMediaRec(await window.TrueNative.mediaGet(id));
   const db = await mediaDb();
   return new Promise((resolve, reject) => {
@@ -3021,7 +3089,7 @@ async function mediaGet(id) {
   });
 }
 
-async function mediaAll() {
+async function mediaAllRaw() {
   if (NATIVE) return (await window.TrueNative.mediaAll()).map(nativeMediaRec);
   const db = await mediaDb();
   return new Promise((resolve, reject) => {
