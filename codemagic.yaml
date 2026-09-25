@@ -1,0 +1,78 @@
+# Codemagic: builds the iOS app in the cloud (no Mac needed) and sends it
+# to TestFlight. Setup steps are in docs/codemagic-ios.md.
+#
+# Start a build from the Codemagic dashboard (Start new build → ios-testflight).
+# It doesn't build on every push: the website deploys from main many times
+# a day, and each iOS build uses Mac minutes.
+
+workflows:
+  ios-testflight:
+    name: iOS → TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+
+    integrations:
+      # The App Store Connect API key added under Codemagic → Team settings →
+      # Integrations. The name there must match this exactly.
+      app_store_connect: True App Store Connect
+
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: uk.co.trueapp.app
+      vars:
+        XCODE_PROJECT: ios/App/App.xcodeproj   # Capacitor 8 uses Swift Package Manager: a project, no workspace
+        XCODE_SCHEME: App
+        # The app's Apple ID: App Store Connect → True → App Information →
+        # General Information → Apple ID (a number). Until it's filled in,
+        # builds fall back to Codemagic's own build counter.
+        APP_STORE_APPLE_ID: ""
+      node: 22        # Capacitor 8 needs Node 22 or newer
+      xcode: latest
+
+    scripts:
+      - name: Install dependencies
+        script: npm ci
+
+      - name: Build the app's web bundle (www/, with native.js)
+        script: npm run build:app
+
+      - name: Copy it into the iOS project and resolve plugins
+        script: npx cap sync ios
+
+      - name: Apply signing profiles to the Xcode project
+        script: xcode-project use-profiles
+
+      - name: Set a build number TestFlight hasn't seen
+        script: |
+          cd "$CM_BUILD_DIR/ios/App"
+          NEXT="$BUILD_NUMBER"
+          if [ -n "$APP_STORE_APPLE_ID" ]; then
+            LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || echo 0)
+            [ "$((LATEST + 1))" -gt "$NEXT" ] && NEXT=$((LATEST + 1))
+          fi
+          echo "Build number: $NEXT"
+          agvtool new-version -all "$NEXT"
+
+      - name: Build the signed .ipa
+        script: |
+          xcode-project build-ipa \
+            --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        # Internal testers (people on your App Store Connect team) get each
+        # build straight away. Uncomment beta_groups once there's an external
+        # group of beta young people; their first build needs Apple's short
+        # beta review.
+        submit_to_testflight: true
+        # beta_groups:
+        #   - Beta young people
+        submit_to_app_store: false
