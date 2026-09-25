@@ -281,6 +281,21 @@ test('new phone: photos come back from the backup, encrypted again', async ({ pa
   expect(await readPhoto(phone2)).toBe(PHOTO);
 });
 
+test('after a restart the lock screen greets them by name, unless True looks like notes', async ({ page }) => {
+  await newAccount(page);
+  await page.locator('#header .lock-btn').click();
+  await page.reload();
+  await expect(page.locator('#lock-hint')).toHaveText('Welcome back, Sam — enter your code');
+
+  await typeOn(page, '#lock-screen', PIN);
+  await expect.poll(() => unlockedStory(page)).toBe(SECRET);
+  await page.evaluate(() => toggleStealth());
+  await page.locator('#header .lock-btn').click();
+  await page.reload();
+  await expect(page.locator('#lock-hint')).toHaveText('Enter your code');
+  expect(JSON.stringify(await saved(page))).not.toContain('Sam');
+});
+
 test('turning backup off deletes the online copy', async ({ page }) => {
   const server = fakeBackupServer();
   await server.attach(page);

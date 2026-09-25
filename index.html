@@ -62,7 +62,8 @@
                              a different thing: moving one must not move the other */
       --text:   #2C281F;
       --text2:  #6B6458;
-      --text3:  #8F8778;
+      --text3:  #70695E;  /* was #8F8778 (3.55:1). Now ≥4.6:1 on --bg, --bg2 and white:
+                             WCAG AA for small text — dates, labels, hints */
       --bg:     #FBF7F0;
       --bg2:    #F3EDE3;
       --bg3:    #E8DFD0;
@@ -770,16 +771,16 @@
     <div class="ob-step" id="ob-4">
       <div class="ob-title">Create your lock code.</div>
       <div class="ob-sub">4 digits. Only you will know it. If you forget it, the recovery code from backup gets you back in — so it's worth turning backup on.</div>
-      <div class="pin-dots" id="ob-dots" style="justify-content:center;margin-bottom:24px">
+      <div class="pin-dots" id="ob-dots" role="img" aria-label="0 of 4 digits entered" style="justify-content:center;margin-bottom:24px">
         <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
       </div>
       <div class="pin-grid" style="margin:0 auto 14px">
         <button class="pin-key" onclick="obPin(1)">1</button><button class="pin-key" onclick="obPin(2)">2</button><button class="pin-key" onclick="obPin(3)">3</button>
         <button class="pin-key" onclick="obPin(4)">4</button><button class="pin-key" onclick="obPin(5)">5</button><button class="pin-key" onclick="obPin(6)">6</button>
         <button class="pin-key" onclick="obPin(7)">7</button><button class="pin-key" onclick="obPin(8)">8</button><button class="pin-key" onclick="obPin(9)">9</button>
-        <div class="pin-key empty"></div><button class="pin-key" onclick="obPin(0)">0</button><button class="pin-key del" onclick="obPinDel()">⌫</button>
+        <div class="pin-key empty"></div><button class="pin-key" onclick="obPin(0)">0</button><button class="pin-key del" aria-label="Delete last digit" onclick="obPinDel()">⌫</button>
       </div>
-      <div class="pin-hint" id="ob-pin-hint">Choose 4 digits you'll remember</div>
+      <div class="pin-hint" id="ob-pin-hint" role="status" aria-live="polite">Choose 4 digits you'll remember</div>
     </div>
   </div>
 
@@ -794,16 +795,16 @@
       <div class="lock-wordmark">true</div>
       <div class="lock-tagline">Your words. Your truth.</div>
     </div>
-    <div class="pin-dots" id="lock-dots">
+    <div class="pin-dots" id="lock-dots" role="img" aria-label="0 of 4 digits entered">
       <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
     </div>
     <div class="pin-grid">
       <button class="pin-key" onclick="lockTap(1)">1</button><button class="pin-key" onclick="lockTap(2)">2</button><button class="pin-key" onclick="lockTap(3)">3</button>
       <button class="pin-key" onclick="lockTap(4)">4</button><button class="pin-key" onclick="lockTap(5)">5</button><button class="pin-key" onclick="lockTap(6)">6</button>
       <button class="pin-key" onclick="lockTap(7)">7</button><button class="pin-key" onclick="lockTap(8)">8</button><button class="pin-key" onclick="lockTap(9)">9</button>
-      <div class="pin-key empty"></div><button class="pin-key" onclick="lockTap(0)">0</button><button class="pin-key del" onclick="lockDel()">⌫</button>
+      <div class="pin-key empty"></div><button class="pin-key" onclick="lockTap(0)">0</button><button class="pin-key del" aria-label="Delete last digit" onclick="lockDel()">⌫</button>
     </div>
-    <div class="pin-hint" id="lock-hint">Enter your code</div>
+    <div class="pin-hint" id="lock-hint" role="status" aria-live="polite">Enter your code</div>
     <button class="btn-secondary btn-sm" id="bio-unlock-btn" onclick="bioUnlock()" style="display:none;margin-top:14px"></button>
     <div style="margin-top:16px;text-align:center">
       <button class="link-quiet" onclick="openForgot()" style="display:block;margin:0 auto 10px">Forgot your code?</button>
@@ -960,16 +961,16 @@
       <div id="fg-pin" style="display:none">
         <div class="page-title" style="font-size:20px" id="fg-pin-title">Choose a new code</div>
         <div style="font-size:14px;color:var(--text2);line-height:1.6;margin:8px 0 18px" id="fg-pin-sub">4 digits. Only you will know it.</div>
-        <div class="pin-dots" id="fg-dots" style="justify-content:center;margin-bottom:20px">
+        <div class="pin-dots" id="fg-dots" role="img" aria-label="0 of 4 digits entered" style="justify-content:center;margin-bottom:20px">
           <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
         </div>
         <div class="pin-grid" style="margin:0 auto 14px">
           <button class="pin-key" onclick="fgPin(1)">1</button><button class="pin-key" onclick="fgPin(2)">2</button><button class="pin-key" onclick="fgPin(3)">3</button>
           <button class="pin-key" onclick="fgPin(4)">4</button><button class="pin-key" onclick="fgPin(5)">5</button><button class="pin-key" onclick="fgPin(6)">6</button>
           <button class="pin-key" onclick="fgPin(7)">7</button><button class="pin-key" onclick="fgPin(8)">8</button><button class="pin-key" onclick="fgPin(9)">9</button>
-          <div class="pin-key empty"></div><button class="pin-key" onclick="fgPin(0)">0</button><button class="pin-key del" onclick="fgPinDel()">⌫</button>
+          <div class="pin-key empty"></div><button class="pin-key" onclick="fgPin(0)">0</button><button class="pin-key del" aria-label="Delete last digit" onclick="fgPinDel()">⌫</button>
         </div>
-        <div class="pin-hint" id="fg-pin-hint">Enter your new code</div>
+        <div class="pin-hint" id="fg-pin-hint" role="status" aria-live="polite">Enter your new code</div>
       </div>
 
       <div style="text-align:center;margin-top:14px" id="fg-close">
@@ -1880,6 +1881,12 @@ async function verifyPin(pin) {
   return (await hashPin(pin, S.pinSalt)) === S.pinHash;
 }
 
+// The PIN dots are visual; this says the same thing to a screen reader
+function dotsLabel(id, n) {
+  const el = document.getElementById(id);
+  if (el) el.setAttribute('aria-label', `${n} of 4 digits entered`);
+}
+
 // ─── Onboarding ───────────────────────────────────────────────
 let obPinEntry = [];
 let obPinConfirm = [];
@@ -1951,6 +1958,7 @@ function obPinDel() {
 function updateObDots() {
   const entry = obPinStep === 1 ? obPinEntry : obPinConfirm;
   document.querySelectorAll('#ob-dots .pin-dot').forEach((d,i) => d.classList.toggle('filled', i < entry.length));
+  dotsLabel('ob-dots', entry.length);
 }
 
 async function finishOnboarding() {
@@ -2142,6 +2150,7 @@ function lockDel() { lockEntry.pop(); updateLockDots(); }
 
 function updateLockDots() {
   document.querySelectorAll('#lock-dots .pin-dot').forEach((d,i) => d.classList.toggle('filled', i < lockEntry.length));
+  dotsLabel('lock-dots', lockEntry.length);
 }
 
 // The lock/onboarding screens are pinned to the viewport, but the app behind
@@ -2882,6 +2891,7 @@ function fgPinDel() {
 function updateFgDots() {
   const entry = fgStep === 1 ? fgEntry : fgConfirm;
   document.querySelectorAll('#fg-dots .pin-dot').forEach((d, i) => d.classList.toggle('filled', i < entry.length));
+  dotsLabel('fg-dots', entry.length);
 }
 
 // No recovery code means no way in — that's the privacy promise. Starting
@@ -3725,7 +3735,9 @@ async function boot() {
 
   // Has PIN — show lock. Do not render the story behind it.
   if (S.pinHash || pendingEnc) {
-    const hintName = S.stealth ? '' : (S.name || '');
+    // After a restart S is only the lock-screen fields, so the name comes
+    // from the hint saved beside the ciphertext (never in "notes" mode)
+    const hintName = S.stealth ? '' : (S.name || (pendingEnc && pendingEnc.nameHint) || '');
     document.getElementById('lock-hint').textContent = hintName ? `Welcome back, ${hintName} — enter your code` : 'Enter your code';
     freezeShell(true);
     showBioUnlock(true);
