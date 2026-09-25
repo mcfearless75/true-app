@@ -1,0 +1,192 @@
+// The words are the product. These tests pin down the ways True has lost
+// them before (both found 25 Sept 2026, both live at the time) and the
+// promises the privacy page makes. If one fails, don't ship.
+
+import { test, expect } from '@playwright/test';
+
+const PIN = '2580';
+const SECRET = 'the-thing-i-never-told-anyone';
+
+// A stand-in for netlify/functions/backup: stores ciphertext by id.
+function fakeBackupServer() {
+  const store = new Map();
+  return {
+    store,
+    async attach(page) {
+      await page.route('**/.netlify/functions/backup**', async route => {
+        const req = route.request();
+        const id = new URL(req.url()).searchParams.get('id');
+        if (req.method() === 'POST') {
+          const body = JSON.parse(req.postData());
+          store.set(body.id, { iv: body.iv, data: body.data, updated: Date.now() });
+          return route.fulfill({ json: { ok: true } });
+        }
+        if (req.method() === 'DELETE') { store.delete(id); return route.fulfill({ json: { ok: true } }); }
+        const rec = store.get(id);
+        return rec ? route.fulfill({ json: rec }) : route.fulfill({ status: 404, json: { error: 'not_found' } });
+      });
+    },
+  };
+}
+
+// A set-up account, as if onboarding had just finished
+async function newAccount(page, { backup = false } = {}) {
+  await page.goto('/index.html');
+  await page.evaluate(async ({ PIN, SECRET }) => {
+    S.name = 'Sam'; S.age = '14-16';
+    S.journals = [{ d: '1 Sep', p: 'x', t: SECRET, ts: Date.now() }];
+    await setPin(PIN);
+    finishOnboarding();
+  }, { PIN, SECRET });
+  if (backup) {
+    await page.evaluate(async () => {
+      enableBackup();
+      // wait for the PIN to be sealed with the recovery code
+      for (let i = 0; i < 100 && !S.pinRescue; i++) await new Promise(r => setTimeout(r, 100));
+      document.getElementById('code-overlay').classList.remove('open');
+      await doBackup(true);
+    });
+  }
+  return page.evaluate(() => S.backupCode);
+}
+
+async function typeOn(page, pad, digits) {
+  for (const d of digits) await page.locator(`${pad} .pin-key`, { hasText: new RegExp(`^${d}$`) }).click();
+}
+
+// New code, entered twice — the pad switches to "again" after a beat
+async function chooseCode(page, pad, hint, digits) {
+  await typeOn(page, pad, digits);
+  await expect(page.locator(hint)).toContainText('again');
+  await typeOn(page, pad, digits);
+}
+
+const unlockedStory = page => page.evaluate(() =>
+  document.getElementById('lock-screen').classList.contains('hidden') ? (S.journals[0] || {}).t : null);
+
+const saved = page => page.evaluate(() => JSON.parse(localStorage.getItem('true_state')));
+
+// ─────────────────────────────────────────────────────────────────────
+
+test('first run: onboarding through the real screens', async ({ page }) => {
+  await page.goto('/index.html');
+  await page.getByRole('button', { name: 'Get started' }).click();
+  await page.locator('#ob-name').fill('Sam');
+  await page.getByRole('button', { name: "That's me" }).click();
+  await page.locator('#age-opts .mood-row', { hasText: '14 – 16' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await chooseCode(page, '#ob-4', '#ob-pin-hint', PIN);
+  await expect(page.locator('#home-greeting')).toHaveText('Hey Sam.');
+  expect((await saved(page)).data).toBeTruthy();   // encrypted from the start
+});
+
+test('Lock then unlock keeps the story (bug: it came back empty and got saved that way)', async ({ page }) => {
+  await newAccount(page);
+  await page.locator('#header .lock-btn').click();
+  await typeOn(page, '#lock-screen', PIN);
+  await expect.poll(() => unlockedStory(page)).toBe(SECRET);
+
+  await page.reload();
+  await typeOn(page, '#lock-screen', PIN);
+  await expect.poll(() => unlockedStory(page)).toBe(SECRET);
+});
+
+test('a mistyped code never wipes the saved story (bug: one typo, then closing True, lost everything)', async ({ page }) => {
+  await newAccount(page);
+  await page.locator('#header .lock-btn').click();
+  await page.reload();
+
+  await typeOn(page, '#lock-screen', '9999');
+  await expect(page.locator('#lock-hint')).toContainText('Incorrect');
+  await typeOn(page, '#lock-screen', '1111');
+  expect((await saved(page)).data).toBeTruthy();
+
+  await page.reload();   // they close the app after the typos
+  await typeOn(page, '#lock-screen', PIN);
+  await expect.poll(() => unlockedStory(page)).toBe(SECRET);
+});
+
+test('nothing readable is saved on the phone', async ({ page }) => {
+  const server = fakeBackupServer();
+  await server.attach(page);
+  const code = await newAccount(page, { backup: true });
+  const raw = await page.evaluate(() => localStorage.getItem('true_state'));
+  expect(raw).not.toContain(SECRET);
+  expect(raw).not.toContain('Sep');     // entry dates live inside the ciphertext too
+  expect(raw).not.toContain(code);
+  expect(raw.replace(/-/g, '')).not.toContain(code.replace(/-/g, ''));
+  // and the backup server only ever sees ciphertext
+  for (const rec of server.store.values()) expect(JSON.stringify(rec)).not.toContain(SECRET);
+});
+
+test('forgot code: the recovery code opens it offline, nothing lost, old code dead', async ({ page }) => {
+  const server = fakeBackupServer();
+  await server.attach(page);
+  const code = await newAccount(page, { backup: true });
+  await page.locator('#header .lock-btn').click();
+  await page.reload();
+  await server.attach(page);
+  let fetched = 0;
+  page.on('request', r => { if (r.url().includes('/functions/backup')) fetched++; });
+
+  await page.getByRole('button', { name: 'Forgot your code?' }).click();
+  await page.locator('#fg-code-input').fill(code.toLowerCase());
+  await page.locator('#fg-code-btn').click();
+  await expect(page.locator('#fg-pin')).toBeVisible({ timeout: 30_000 });
+  await chooseCode(page, '#fg-pin', '#fg-pin-hint', '4444');
+  await expect.poll(() => unlockedStory(page), { timeout: 30_000 }).toBe(SECRET);
+  expect(fetched).toBe(0);   // the sealed PIN did it, on the phone
+
+  await page.reload();
+  await typeOn(page, '#lock-screen', PIN);
+  await expect(page.locator('#lock-hint')).toContainText('Incorrect');
+  await typeOn(page, '#lock-screen', '4444');
+  await expect.poll(() => unlockedStory(page)).toBe(SECRET);
+});
+
+test('forgot code: a wrong recovery code is refused', async ({ page }) => {
+  const server = fakeBackupServer();
+  await server.attach(page);
+  await newAccount(page, { backup: true });
+  await page.locator('#header .lock-btn').click();
+  await page.getByRole('button', { name: 'Forgot your code?' }).click();
+  await page.locator('#fg-code-input').fill('AAAA-BBBB-CCCC-DDDD-EEEE');
+  await page.locator('#fg-code-btn').click();
+  await expect(page.locator('#fg-code-msg')).toContainText("doesn't match", { timeout: 30_000 });
+  await expect(page.locator('#fg-pin')).toBeHidden();
+});
+
+test('new phone: restore brings the story back and asks for a new code', async ({ page, browser }) => {
+  const server = fakeBackupServer();
+  await server.attach(page);
+  const code = await newAccount(page, { backup: true });
+  expect(server.store.size).toBe(1);
+
+  const phone2 = await (await browser.newContext({ serviceWorkers: 'block' })).newPage();
+  await server.attach(phone2);
+  await phone2.goto('/index.html');
+  await phone2.getByRole('button', { name: /I had True before/ }).click();
+  await phone2.locator('#restore-code').fill(code);
+  await phone2.locator('#restore-btn').click();
+  await expect(phone2.locator('#fg-pin-title')).toHaveText('Welcome back', { timeout: 30_000 });
+  const reloaded = phone2.waitForEvent('load', { timeout: 30_000 });
+  await chooseCode(phone2, '#fg-pin', '#fg-pin-hint', '7777');
+  await reloaded;
+  await expect(phone2.locator('#lock-screen')).toBeVisible();
+
+  await typeOn(phone2, '#lock-screen', PIN);   // the old code doesn't come with it
+  await expect(phone2.locator('#lock-hint')).toContainText('Incorrect');
+  await typeOn(phone2, '#lock-screen', '7777');
+  await expect.poll(() => unlockedStory(phone2)).toBe(SECRET);
+});
+
+test('turning backup off deletes the online copy', async ({ page }) => {
+  const server = fakeBackupServer();
+  await server.attach(page);
+  await newAccount(page, { backup: true });
+  expect(server.store.size).toBe(1);
+  page.on('dialog', d => d.accept());
+  await page.evaluate(() => disableBackup());
+  expect(server.store.size).toBe(0);
+  expect((await saved(page)).pinRescue).toBeFalsy();
+});

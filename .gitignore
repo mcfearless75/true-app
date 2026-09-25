@@ -24,3 +24,7 @@ www/
 *.jks
 *.keystore
 keystore.properties
+
+# Test output
+test-results/
+playwright-report/

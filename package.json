@@ -7,7 +7,8 @@
     "android": "npm run sync && npx cap open android",
     "assets": "node scripts/make-app-assets.mjs",
     "release:android": "node scripts/release-android.mjs",
-    "store": "node scripts/make-store-assets.mjs"
+    "store": "node scripts/make-store-assets.mjs",
+    "test": "playwright test"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",
@@ -21,6 +22,7 @@
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.5.2",
+    "@playwright/test": "^1.63.0",
     "esbuild": "^0.28.2"
   }
 }
