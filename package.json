@@ -5,7 +5,8 @@
     "build:app": "node scripts/build-www.mjs",
     "sync": "npm run build:app && npx cap sync",
     "android": "npm run sync && npx cap open android",
-    "assets": "node scripts/make-app-assets.mjs"
+    "assets": "node scripts/make-app-assets.mjs",
+    "release:android": "node scripts/release-android.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",

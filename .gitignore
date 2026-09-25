@@ -19,3 +19,8 @@ true-app/
 
 # Built app bundle (npm run build:app)
 www/
+
+# Android signing — the key and its passwords never go in git
+*.jks
+*.keystore
+keystore.properties

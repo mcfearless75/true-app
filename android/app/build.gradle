@@ -1,5 +1,14 @@
 apply plugin: 'com.android.application'
 
+// Release signing. The upload key and its passwords live outside git, in
+// android/keystore.properties (see android/keystore.properties.example).
+// No file = debug builds work as normal, release builds refuse to run.
+def keystorePropsFile = rootProject.file('keystore.properties')
+def keystoreProps = new Properties()
+if (keystorePropsFile.exists()) {
+    keystorePropsFile.withInputStream { keystoreProps.load(it) }
+}
+
 android {
     namespace = "uk.co.trueapp.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,8 +25,21 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (keystorePropsFile.exists()) {
+                storeFile file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
+            if (keystorePropsFile.exists()) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
@@ -43,6 +65,16 @@ dependencies {
 }
 
 apply from: 'capacitor.build.gradle'
+
+// An unsigned release can't go to Play — say so up front instead of
+// producing one that fails at upload.
+gradle.taskGraph.whenReady { graph ->
+    if (graph.allTasks.any { it.name.toLowerCase().contains('release') } && !keystorePropsFile.exists()) {
+        throw new GradleException(
+            "No android/keystore.properties — release builds need the upload key.\n" +
+            "Copy android/keystore.properties.example to android/keystore.properties and fill it in.")
+    }
+}
 
 try {
     def servicesJSON = file('google-services.json')
