@@ -347,3 +347,134 @@ test('turning backup off deletes the online copy', async ({ page }) => {
   expect(server.store.size).toBe(0);
   expect((await saved(page)).pinRescue).toBeFalsy();
 });
+
+// ─── 6-digit codes, and lockouts that grow (DPIA R1) ─────────────────
+
+const PIN6 = '258046';
+
+test('a 6-digit code works through onboarding, lock and restart', async ({ page }) => {
+  await page.goto('/index.html');
+  await page.getByRole('button', { name: 'Get started' }).click();
+  await page.locator('#ob-name').fill('Sam');
+  await page.getByRole('button', { name: "That's me" }).click();
+  await page.locator('#age-opts .mood-row', { hasText: '14 – 16' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Use 6 digits instead' }).click();
+  await expect(page.locator('#ob-dots')).toHaveAttribute('aria-label', '0 of 6 digits entered');
+  await chooseCode(page, '#ob-4', '#ob-pin-hint', PIN6);
+  await expect(page.locator('#home-greeting')).toHaveText('Hey Sam.');
+  await page.evaluate(async SECRET => { S.journals = [{ d: '1 Sep', p: 'x', t: SECRET, ts: Date.now() }]; await saveState(); }, SECRET);
+
+  await page.locator('#header .lock-btn').click();
+  await page.reload();
+  await expect(page.locator('#lock-dots .pin-dot')).toHaveCount(6);
+  await typeOn(page, '#lock-screen', PIN6.slice(0, 4));   // 4 of 6 doesn't try to open it
+  await page.waitForTimeout(500);
+  await expect(page.locator('#lock-hint')).not.toContainText('Incorrect');
+  await typeOn(page, '#lock-screen', PIN6.slice(4));
+  await expect.poll(() => unlockedStory(page)).toBe(SECRET);
+});
+
+test('a 4-digit code from before 6 was offered still opens True', async ({ page }) => {
+  await newAccount(page);
+  await page.locator('#header .lock-btn').click();
+  // what an older install left on the phone: no pinLen, no pinLockouts
+  await page.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem('true_state'));
+    delete s.pinLen; delete s.pinLockouts;
+    localStorage.setItem('true_state', JSON.stringify(s));
+  });
+  await page.reload();
+  await expect(page.locator('#lock-dots .pin-dot')).toHaveCount(4);
+  await typeOn(page, '#lock-screen', PIN);
+  await expect.poll(() => unlockedStory(page)).toBe(SECRET);
+});
+
+test('forgot code: a 6-digit new code, then back to 4, both work', async ({ page }) => {
+  const server = fakeBackupServer();
+  await server.attach(page);
+  const code = await newAccount(page, { backup: true });
+  await page.locator('#header .lock-btn').click();
+
+  const forgot = async () => {
+    await page.getByRole('button', { name: 'Forgot your code?' }).click();
+    await page.locator('#fg-code-input').fill(code);
+    await page.locator('#fg-code-btn').click();
+    await expect(page.locator('#fg-pin')).toBeVisible({ timeout: 30_000 });
+  };
+
+  await forgot();
+  await page.getByRole('button', { name: 'Use 6 digits instead' }).click();
+  await chooseCode(page, '#fg-pin', '#fg-pin-hint', PIN6);
+  await expect.poll(() => unlockedStory(page), { timeout: 30_000 }).toBe(SECRET);
+  await expect.poll(() => page.evaluate(() => !!S.pinRescue)).toBe(true);   // resealed for next time
+
+  await page.locator('#header .lock-btn').click();
+  await page.reload();
+  await server.attach(page);
+  await expect(page.locator('#lock-dots .pin-dot')).toHaveCount(6);
+  await forgot();   // the rescue seal holds a 6-digit code just as well
+  await expect(page.locator('#fg-dots .pin-dot')).toHaveCount(4);   // back to 4 by default
+  await chooseCode(page, '#fg-pin', '#fg-pin-hint', '4444');
+  await expect.poll(() => unlockedStory(page), { timeout: 30_000 }).toBe(SECRET);
+
+  await page.locator('#header .lock-btn').click();
+  await page.reload();
+  await expect(page.locator('#lock-dots .pin-dot')).toHaveCount(4);
+  await typeOn(page, '#lock-screen', '4444');
+  await expect.poll(() => unlockedStory(page)).toBe(SECRET);
+});
+
+test('each lockout in a row waits longer, and the right code resets it', async ({ page }) => {
+  await newAccount(page);
+  await page.locator('#header .lock-btn').click();
+  const fiveWrong = async () => {
+    for (let i = 0; i < 5; i++) {
+      await typeOn(page, '#lock-screen', '9999');
+      await expect.poll(() => page.evaluate(() => lockEntry.length)).toBe(0);
+    }
+  };
+  const skipWait = () => page.evaluate(async () => { S.pinLockUntil = 0; await saveState(); });
+
+  await fiveWrong();
+  await expect(page.locator('#lock-hint')).toHaveText('Too many tries — wait 30 seconds');
+  await typeOn(page, '#lock-screen', PIN);   // locked means locked, even for the right code
+  await expect(page.locator('#lock-screen')).toBeVisible();
+  expect(await unlockedStory(page)).toBe(null);
+
+  await skipWait();
+  await fiveWrong();
+  await expect(page.locator('#lock-hint')).toHaveText('Too many tries — wait 1 minute');
+
+  await page.reload();   // closing True doesn't reset it
+  await skipWait();
+  await fiveWrong();
+  await expect(page.locator('#lock-hint')).toHaveText('Too many tries — wait 5 minutes');
+  await skipWait();
+  await fiveWrong();
+  await expect(page.locator('#lock-hint')).toHaveText('Too many tries — wait 15 minutes');
+  await skipWait();
+  await fiveWrong();
+  await expect(page.locator('#lock-hint')).toHaveText('Too many tries — wait 15 minutes');   // the cap
+
+  await skipWait();
+  await typeOn(page, '#lock-screen', PIN);
+  await expect.poll(() => unlockedStory(page)).toBe(SECRET);
+  expect(await page.evaluate(() => S.pinLockouts)).toBe(0);
+});
+
+// ─── No streaks (Children's Code standard 13, DPIA R6) ───────────────
+
+test('Your patterns counts check-in days without a streak to break', async ({ page }) => {
+  await newAccount(page);
+  const text = await page.evaluate(() => {
+    const day = 86400000, now = Date.now();
+    // three different days with gaps between them, and one too old to count
+    S.moods = [0, 3, 3, 9, 40].map((ago, i) => ({ v: 3, ts: now - ago * day - i * 1000 }));
+    renderPatterns();
+    return document.getElementById('patterns-card').innerText;
+  });
+  expect(text).toContain("You've checked in on 3 days in the last month.");
+  expect(text.toLowerCase()).not.toContain('streak');
+  expect(text.toLowerCase()).not.toContain('in a row');
+});

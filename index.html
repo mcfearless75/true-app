@@ -770,7 +770,7 @@
     <!-- Step 4: PIN setup -->
     <div class="ob-step" id="ob-4">
       <div class="ob-title">Create your lock code.</div>
-      <div class="ob-sub">4 digits. Only you will know it. If you forget it, the recovery code from backup gets you back in — so it's worth turning backup on.</div>
+      <div class="ob-sub">Only you will know it. If you forget it, the recovery code from backup gets you back in — so it's worth turning backup on.</div>
       <div class="pin-dots" id="ob-dots" role="img" aria-label="0 of 4 digits entered" style="justify-content:center;margin-bottom:24px">
         <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
       </div>
@@ -781,6 +781,7 @@
         <div class="pin-key empty"></div><button class="pin-key" onclick="obPin(0)">0</button><button class="pin-key del" aria-label="Delete last digit" onclick="obPinDel()">⌫</button>
       </div>
       <div class="pin-hint" id="ob-pin-hint" role="status" aria-live="polite">Choose 4 digits you'll remember</div>
+      <button class="link-quiet" id="ob-pin-len" onclick="obPinLen()" style="display:block;margin:10px auto 0">Use 6 digits instead</button>
     </div>
   </div>
 
@@ -961,7 +962,7 @@
       <!-- New code, entered twice -->
       <div id="fg-pin" style="display:none">
         <div class="page-title" style="font-size:20px" id="fg-pin-title">Choose a new code</div>
-        <div style="font-size:14px;color:var(--text2);line-height:1.6;margin:8px 0 18px" id="fg-pin-sub">4 digits. Only you will know it.</div>
+        <div style="font-size:14px;color:var(--text2);line-height:1.6;margin:8px 0 18px" id="fg-pin-sub">Only you will know it.</div>
         <div class="pin-dots" id="fg-dots" role="img" aria-label="0 of 4 digits entered" style="justify-content:center;margin-bottom:20px">
           <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
         </div>
@@ -972,6 +973,7 @@
           <div class="pin-key empty"></div><button class="pin-key" onclick="fgPin(0)">0</button><button class="pin-key del" aria-label="Delete last digit" onclick="fgPinDel()">⌫</button>
         </div>
         <div class="pin-hint" id="fg-pin-hint" role="status" aria-live="polite">Enter your new code</div>
+        <button class="link-quiet" id="fg-pin-len" onclick="fgPinLen()" style="display:block;margin:10px auto 0">Use 6 digits instead</button>
       </div>
 
       <div style="text-align:center;margin-top:14px" id="fg-close">
@@ -1593,6 +1595,8 @@ let S = {
   pinSalt: '',
   pinFails: 0,
   pinLockUntil: 0,
+  pinLockouts: 0, // lockouts in a row — each one waits longer
+  pinLen: 4,      // 4 or 6; codes from before 6 was offered have no pinLen, so 4
   promptIndex: 0,
   selectedMoodVal: null,
   selectedMoodLabel: null,
@@ -1667,6 +1671,8 @@ function stateMeta() {
     pinHash: S.pinHash || '',
     pinFails: S.pinFails || 0,
     pinLockUntil: S.pinLockUntil || 0,
+    pinLockouts: S.pinLockouts || 0,
+    pinLen: pinLength(),
     stealth: !!S.stealth,
     // Locked after a restart, S has no name — keep the hint we already had
     nameHint: S.stealth ? '' : (S.name || (pendingEnc && pendingEnc.nameHint) || ''),
@@ -1747,6 +1753,8 @@ function loadState() {
       S.pinHash = saved.pinHash || '';
       S.pinFails = saved.pinFails || 0;
       S.pinLockUntil = saved.pinLockUntil || 0;
+      S.pinLockouts = saved.pinLockouts || 0;
+      S.pinLen = saved.pinLen || 4;
       S.stealth = !!saved.stealth;
       S.pinRescue = saved.pinRescue || null;
       S.bioOn = !!saved.bioOn;
@@ -1794,6 +1802,8 @@ function lockMemory() {
     pinSalt: S.pinSalt,
     pinFails: S.pinFails,
     pinLockUntil: S.pinLockUntil,
+    pinLockouts: S.pinLockouts,
+    pinLen: S.pinLen,
     stealth: S.stealth,
     vaultOn: S.vaultOn,
     backupCode: S.backupCode,
@@ -1807,7 +1817,7 @@ function lockMemory() {
   mediaCryptoKey = null;
   S = Object.assign({
     name: '', age: '', pin: '', pinHash: '', pinSalt: '', pinFails: 0, pinLockUntil: 0,
-    promptIndex: 0, selectedMoodVal: null, selectedMoodLabel: null, selectedMsCat: null,
+    pinLockouts: 0, pinLen: 4, promptIndex: 0, selectedMoodVal: null, selectedMoodLabel: null, selectedMsCat: null,
     journeyFilter: 'all', checkedInToday: false, moods: [], journals: [], milestones: [],
     letters: [], selectedValues: [], goals: [], selfNote: '', backupCode: '', backupLast: 0,
     vaultOn: false, stealth: false, backupOffered: false,
@@ -1817,7 +1827,22 @@ function lockMemory() {
 // ─── PIN security ─────────────────────────────────────────────
 // The PIN is never stored. A salted SHA-256 hash is kept instead.
 const PIN_MAX_FAILS = 5;
-const PIN_LOCK_MS = 30000;
+// Each lockout in a row waits longer, up to 15 minutes. Someone guessing a
+// 4-digit code at the keypad now needs weeks, not hours; the young person
+// who just fat-fingered it waits 30 seconds, and a correct code (or Face ID)
+// resets it. Capped so a sibling can't lock them out of their own story for long.
+const PIN_LOCK_STEPS_MS = [30000, 60000, 5 * 60000, 15 * 60000];
+
+// The code can be 4 or 6 digits. Everything past the keypads (the key, the
+// hash, the rescue seal, Face ID) takes it as a string of any length.
+const pinLength = () => (S.pinLen === 6 ? 6 : 4);
+
+function waitText(ms) {
+  const secs = Math.ceil(ms / 1000);
+  if (secs < 60) return `${secs} second${secs !== 1 ? 's' : ''}`;
+  const mins = Math.ceil(secs / 60);
+  return `${mins} minute${mins !== 1 ? 's' : ''}`;
+}
 
 function randomSalt() {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
@@ -1835,6 +1860,7 @@ async function hashPin(pin, salt) {
 async function setPin(pin) {
   S.pinSalt = randomSalt();
   S.pinHash = await hashPin(pin, S.pinSalt);
+  S.pinLen = String(pin).length;
   S.pin = '';
   S.pinRescue = null;             // sealed the old code — reseal below
   // Quick unlock holds the old code; a new code means switching it on again
@@ -1850,7 +1876,7 @@ async function setPin(pin) {
 // The story is encrypted with a key from the PIN, so a forgotten PIN would
 // strand it. When backup is on, the PIN is also sealed with the recovery
 // code and kept next to the ciphertext. The recovery code (~98 bits) is far
-// stronger than the 4 digits it protects, so this adds no weak point — it
+// stronger than the 4 or 6 digits it protects, so this adds no weak point — it
 // just means the one thing only they were given can still open the door.
 let sessionPin = null;          // in RAM only while unlocked, like sessionKey
 
@@ -1883,16 +1909,20 @@ async function verifyPin(pin) {
   return (await hashPin(pin, S.pinSalt)) === S.pinHash;
 }
 
-// The PIN dots are visual; this says the same thing to a screen reader
-function dotsLabel(id, n) {
+// The PIN dots are visual; the label says the same thing to a screen reader
+function showDots(id, filled, total) {
   const el = document.getElementById(id);
-  if (el) el.setAttribute('aria-label', `${n} of 4 digits entered`);
+  if (!el) return;
+  if (el.children.length !== total) el.innerHTML = '<div class="pin-dot"></div>'.repeat(total);
+  [...el.children].forEach((d, i) => d.classList.toggle('filled', i < filled));
+  el.setAttribute('aria-label', `${filled} of ${total} digits entered`);
 }
 
 // ─── Onboarding ───────────────────────────────────────────────
 let obPinEntry = [];
 let obPinConfirm = [];
 let obPinStep = 1;
+let obLen = 4;
 
 function showOnboarding() {
   document.getElementById('onboarding').classList.remove('hidden');
@@ -1919,12 +1949,21 @@ function selAge(label, val) {
   S.age = label;
 }
 
+// 4 stays the default: a code a 10-year-old forgets is a story they lose
+function obPinLen() {
+  obLen = obLen === 4 ? 6 : 4;
+  obPinEntry = []; obPinConfirm = []; obPinStep = 1;
+  updateObDots();
+  document.getElementById('ob-pin-hint').textContent = `Choose ${obLen} digits you'll remember`;
+  document.getElementById('ob-pin-len').textContent = `Use ${obLen === 4 ? 6 : 4} digits instead`;
+}
+
 function obPin(n) {
   if (obPinStep === 1) {
-    if (obPinEntry.length >= 4) return;
+    if (obPinEntry.length >= obLen) return;
     obPinEntry.push(n);
     updateObDots();
-    if (obPinEntry.length === 4) {
+    if (obPinEntry.length === obLen) {
       setTimeout(() => {
         obPinStep = 2;
         // obPinEntry is kept — the confirm step compares against it
@@ -1933,10 +1972,10 @@ function obPin(n) {
       }, 300);
     }
   } else {
-    if (obPinConfirm.length >= 4) return;
+    if (obPinConfirm.length >= obLen) return;
     obPinConfirm.push(n);
     updateObDots();
-    if (obPinConfirm.length === 4) {
+    if (obPinConfirm.length === obLen) {
       setTimeout(async () => {
         if (obPinEntry.join('') === obPinConfirm.join('')) {
           await setPin(obPinConfirm.join(''));
@@ -1959,8 +1998,7 @@ function obPinDel() {
 
 function updateObDots() {
   const entry = obPinStep === 1 ? obPinEntry : obPinConfirm;
-  document.querySelectorAll('#ob-dots .pin-dot').forEach((d,i) => d.classList.toggle('filled', i < entry.length));
-  dotsLabel('ob-dots', entry.length);
+  showDots('ob-dots', entry.length, obLen);
 }
 
 async function finishOnboarding() {
@@ -1977,14 +2015,13 @@ let lockEntry = [];
 
 function lockTap(n) {
   if (Date.now() < (S.pinLockUntil || 0)) {
-    const secs = Math.ceil((S.pinLockUntil - Date.now()) / 1000);
-    document.getElementById('lock-hint').textContent = `Too many tries — wait ${secs} second${secs !== 1 ? 's' : ''}`;
+    document.getElementById('lock-hint').textContent = `Too many tries — wait ${waitText(S.pinLockUntil - Date.now())}`;
     return;
   }
-  if (lockEntry.length >= 4) return;
+  if (lockEntry.length >= pinLength()) return;
   lockEntry.push(n);
   updateLockDots();
-  if (lockEntry.length === 4) {
+  if (lockEntry.length === pinLength()) {
     setTimeout(async () => {
       const pin = lockEntry.join('');
       if (await verifyPin(pin)) {
@@ -1993,9 +2030,11 @@ function lockTap(n) {
         S.pinFails = (S.pinFails || 0) + 1;
         let hint = 'Incorrect code — try again';
         if (S.pinFails >= PIN_MAX_FAILS) {
-          S.pinLockUntil = Date.now() + PIN_LOCK_MS;
+          const wait = PIN_LOCK_STEPS_MS[Math.min(S.pinLockouts || 0, PIN_LOCK_STEPS_MS.length - 1)];
+          S.pinLockUntil = Date.now() + wait;
+          S.pinLockouts = (S.pinLockouts || 0) + 1;
           S.pinFails = 0;
-          hint = 'Too many tries — wait 30 seconds';
+          hint = `Too many tries — wait ${waitText(wait)}`;
         }
         saveState();
         document.getElementById('lock-hint').textContent = hint;
@@ -2017,6 +2056,7 @@ async function openWithPin(pin) {
   }
   S.pinFails = 0;
   S.pinLockUntil = 0;
+  S.pinLockouts = 0;
   sessionPin = pin;
   await saveState();
   unlock();
@@ -2151,8 +2191,7 @@ async function renderAppSettings() {
 function lockDel() { lockEntry.pop(); updateLockDots(); }
 
 function updateLockDots() {
-  document.querySelectorAll('#lock-dots .pin-dot').forEach((d,i) => d.classList.toggle('filled', i < lockEntry.length));
-  dotsLabel('lock-dots', lockEntry.length);
+  showDots('lock-dots', lockEntry.length, pinLength());
 }
 
 // The lock/onboarding screens are pinned to the viewport, but the app behind
@@ -2402,7 +2441,7 @@ function deleteGoal(i) {
 // including memory box photos and voice notes as data URLs.
 // PIN material and transient UI state are excluded.
 async function exportData() {
-  const { pin, pinHash, pinSalt, pinFails, pinLockUntil, backupCode, backupLast,
+  const { pin, pinHash, pinSalt, pinFails, pinLockUntil, pinLockouts, pinLen, backupCode, backupLast,
           selectedMoodVal, selectedMoodLabel, selectedMsCat, journeyFilter, ...mine } = S;
   const payload = {
     app: 'True',
@@ -2442,13 +2481,12 @@ function saveSelfNote() {
 }
 
 // ─── Your patterns — computed on-device, never sent anywhere ──
-function checkinStreak() {
-  const days = new Set(S.moods.map(m => new Date(m.ts).toDateString()));
-  let streak = 0;
-  const d = new Date();
-  if (!days.has(d.toDateString())) d.setDate(d.getDate() - 1); // today not logged yet doesn't break it
-  while (days.has(d.toDateString())) { streak++; d.setDate(d.getDate() - 1); }
-  return streak;
+// A count, not a streak: there's no run to keep going and nothing to break,
+// so a day off never reads as failing (ICO Children's Code, standard 13).
+function checkinDaysThisMonth() {
+  const MONTH = 30 * 86400000;
+  const now = Date.now();
+  return new Set(S.moods.filter(m => now - m.ts < MONTH).map(m => new Date(m.ts).toDateString())).size;
 }
 
 function renderPatterns() {
@@ -2463,8 +2501,8 @@ function renderPatterns() {
   const lastWeek = avg(S.moods.filter(m => now - m.ts >= WEEK && now - m.ts < 2 * WEEK));
 
   const rows = [];
-  const streak = checkinStreak();
-  if (streak >= 2) rows.push(`You're on a <b>${streak}-day</b> check-in streak.`);
+  const days = checkinDaysThisMonth();
+  if (days >= 2) rows.push(`You've checked in on <b>${days} days</b> in the last month.`);
 
   if (thisWeek !== null && lastWeek !== null) {
     const diff = thisWeek - lastWeek;
@@ -2831,7 +2869,7 @@ async function disableBackup() {
 // was given. First choice: open the PIN rescue on this phone (offline,
 // nothing lost). Fallback for installs that were never sealed: pull the
 // encrypted backup. No adult, no account, no one else.
-let fgEntry = [], fgConfirm = [], fgStep = 1;
+let fgEntry = [], fgConfirm = [], fgStep = 1, fgLen = 4;
 let fgOnDone = null;   // what happens once a new code is confirmed
 
 function fgShow(pane) {
@@ -2872,11 +2910,12 @@ async function checkForgotCode() {
     if (oldPin && await verifyPin(oldPin) && await openEncryptedState(oldPin)) {
       askNewPin({
         title: 'Choose a new code',
-        sub: '4 digits. Only you will know it.',
+        sub: 'Only you will know it.',
         canCancel: false,
         onDone: async pin => {
           S.pinFails = 0;
           S.pinLockUntil = 0;
+          S.pinLockouts = 0;
           await setPin(pin);
           closeForgot();
           unlock();
@@ -2904,19 +2943,28 @@ function askNewPin({ title, sub, canCancel, onDone }) {
   document.getElementById('fg-pin-sub').textContent = sub;
   document.getElementById('fg-pin-hint').textContent = 'Enter your new code';
   document.getElementById('fg-close').style.display = canCancel ? 'block' : 'none';
-  fgEntry = []; fgConfirm = []; fgStep = 1;
+  fgEntry = []; fgConfirm = []; fgStep = 1; fgLen = 4;
   fgOnDone = onDone;
+  document.getElementById('fg-pin-len').textContent = 'Use 6 digits instead';
   updateFgDots();
   fgShow('fg-pin');
   document.getElementById('forgot-overlay').classList.add('open');
 }
 
+function fgPinLen() {
+  fgLen = fgLen === 4 ? 6 : 4;
+  fgEntry = []; fgConfirm = []; fgStep = 1;
+  updateFgDots();
+  document.getElementById('fg-pin-hint').textContent = 'Enter your new code';
+  document.getElementById('fg-pin-len').textContent = `Use ${fgLen === 4 ? 6 : 4} digits instead`;
+}
+
 function fgPin(n) {
   const entry = fgStep === 1 ? fgEntry : fgConfirm;
-  if (entry.length >= 4) return;
+  if (entry.length >= fgLen) return;
   entry.push(n);
   updateFgDots();
-  if (entry.length < 4) return;
+  if (entry.length < fgLen) return;
   setTimeout(async () => {
     if (fgStep === 1) {
       fgStep = 2;
@@ -2939,8 +2987,7 @@ function fgPinDel() {
 
 function updateFgDots() {
   const entry = fgStep === 1 ? fgEntry : fgConfirm;
-  document.querySelectorAll('#fg-dots .pin-dot').forEach((d, i) => d.classList.toggle('filled', i < entry.length));
-  dotsLabel('fg-dots', entry.length);
+  showDots('fg-dots', entry.length, fgLen);
 }
 
 // No recovery code means no way in — that's the privacy promise. Starting
@@ -2979,7 +3026,7 @@ async function applyRestore(payload, updated) {
   // precisely because they forgot it, so a restored phone always gets a new one.
   const state = payload.state;
   delete state.pin;
-  state.pinHash = ''; state.pinSalt = ''; state.pinFails = 0; state.pinLockUntil = 0; state.pinRescue = null;
+  state.pinHash = ''; state.pinSalt = ''; state.pinFails = 0; state.pinLockUntil = 0; state.pinLockouts = 0; state.pinRescue = null;
   const when = updated
     ? ' Your backup is from ' + new Date(updated).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + '.'
     : '';
@@ -3789,6 +3836,7 @@ async function boot() {
     const hintName = S.stealth ? '' : (S.name || (pendingEnc && pendingEnc.nameHint) || '');
     document.getElementById('lock-hint').textContent = hintName ? `Welcome back, ${hintName} — enter your code` : 'Enter your code';
     freezeShell(true);
+    updateLockDots();
     showBioUnlock(true);
     return;
   }

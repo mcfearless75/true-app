@@ -30,6 +30,15 @@ test('first-run screen has no WCAG AA violations', async ({ page }) => {
   expect(await audit(page)).toEqual([]);
 });
 
+test('choosing a code, 4 or 6 digits, has no WCAG AA violations', async ({ page }) => {
+  await page.goto('/index.html');
+  await page.evaluate(() => obNext(4));
+  expect(await audit(page)).toEqual([]);
+  await page.getByRole('button', { name: 'Use 6 digits instead' }).click();
+  await expect(page.locator('#ob-dots')).toHaveAttribute('aria-label', '0 of 6 digits entered');
+  expect(await audit(page)).toEqual([]);
+});
+
 test('every app screen has no WCAG AA violations', async ({ page }) => {
   await page.goto('/index.html?demo=1');
   const found = [];

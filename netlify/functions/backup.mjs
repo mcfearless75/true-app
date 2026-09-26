@@ -6,8 +6,10 @@
 // the recovery code, so possession of the code is the only credential.
 //
 // There is nothing here to subpoena: no accounts, no names, no plaintext.
+// Backups untouched for 7 years expire (netlify/lib/backup-expiry.mjs).
 
 import { getStore } from '@netlify/blobs';
+import { isExpired } from '../lib/backup-expiry.mjs';
 
 const ID_RE = /^[0-9a-f]{32}$/;
 const MAX_CIPHERTEXT_CHARS = 6_000_000; // ~4.5MB binary — function payload ceiling
@@ -53,7 +55,8 @@ export default async (req) => {
         typeof data !== 'string' || data.length === 0 || data.length > MAX_CIPHERTEXT_CHARS) {
       return json({ error: 'bad_request' }, { status: 400 });
     }
-    await store.setJSON(id, { iv, data, updated: Date.now() });
+    const updated = Date.now();
+    await store.setJSON(id, { iv, data, updated }, { metadata: { updated } });
     return json({ ok: true });
   }
 
@@ -64,7 +67,9 @@ export default async (req) => {
 
   if (req.method === 'GET') {
     const rec = await store.get(id, { type: 'json' });
-    if (!rec) return json({ error: 'not_found' }, { status: 404 });
+    // Past its 7 years but not swept yet: gone is gone, whichever runs first
+    if (rec && isExpired(rec.updated)) await store.delete(id);
+    if (!rec || isExpired(rec.updated)) return json({ error: 'not_found' }, { status: 404 });
     return json(rec, { headers: { 'cache-control': 'no-store' } });
   }
 

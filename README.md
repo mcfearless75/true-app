@@ -27,7 +27,7 @@ Demo account for stakeholder walkthroughs: `index.html?demo=1` — loads a pre-p
 | Screen | What it does |
 |--------|-------------|
 | **Onboarding** | Name, age band, PIN setup — first run only |
-| **Lock screen** | 4-digit PIN. Help is available without unlocking. After a correct PIN the story is decrypted into memory |
+| **Lock screen** | 4- or 6-digit PIN (the young person chooses; 4 is the default). Help is available without unlocking. After a correct PIN the story is decrypted into memory |
 | **Home** | Greeting, mood bar, today's prompt, last milestone |
 | **Mood** | 5-point check-in with optional private note |
 | **Journal** | Age-adaptive rotating prompts (10–13 / 14–16 / 17+), full history |
@@ -51,9 +51,9 @@ There is **no AI**. Journal text is never sent to a model.
 ## Privacy & security
 
 - On-device text is stored as AES-GCM ciphertext after the first successful PIN (migrates older plaintext accounts on next unlock). Photos and voice notes remain in IndexedDB on the device.
-- The PIN is never stored — only a salted SHA-256 hash. Wrong PIN lockout after 5 tries (30s).
+- The PIN is never stored — only a salted SHA-256 hash. After 5 wrong tries True locks for 30s, then 1, 5 and 15 minutes for each lockout in a row; a correct code resets it.
 - Locking the app drops the story from memory. Help still works.
-- Optional backup is zero-knowledge ciphertext only.
+- Optional backup is zero-knowledge ciphertext only. Backups untouched for 7 years are deleted by a daily scheduled function (`netlify/functions/backup-expiry.mjs`).
 - `commissioners.html` is the buyer page: what they fund, what they will never see.
 
 ---
